@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Our Trading Office — The Plan</title>
+<style>
+@page { size: A4; margin: 0; }
+:root{
+  --ink:#15171C; --ink2:#3F4551; --muted:#7B818D; --line:#E6E1D7; --panel:#F7F4EE; --paper:#FFFFFF;
+  --gold:#E3A82B; --gold-deep:#8F6106; --gold-soft:#FBF1DA;
+  --demo:#3D6FE0; --demo-deep:#2A55B8; --demo-soft:#E9EFFC;
+  --live:#1E9A5B; --live-deep:#15754A; --live-soft:#E3F4EA;
+  --red:#C9433E; --red-soft:#FBE8E6;
+  --teal:#1597A8; --teal-soft:#E2F4F6;
+  --dark:#0E1014;
+  --head:"Bahnschrift","Segoe UI",sans-serif;
+  --body:"Segoe UI Variable Text","Segoe UI",sans-serif;
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ font-family:var(--body); color:var(--ink); font-size:9.8pt; line-height:1.45; background:#fff;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.page{ width:210mm; height:297mm; position:relative; overflow:hidden; padding:25mm 18mm 20mm;
+  break-after:page; page-break-after:always; background:var(--paper); }
+.page:last-of-type{ break-after:auto; page-break-after:auto; }
+
+/* running head / foot */
+.rh{ position:absolute; top:10mm; left:18mm; right:18mm; display:flex; justify-content:space-between; align-items:center;
+  font-family:var(--head); font-size:7.2pt; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+.mk{ display:flex; align-items:center; gap:2mm; font-weight:600; color:var(--ink); }
+.mk svg{ width:4.4mm; height:4.4mm; }
+.rf{ position:absolute; bottom:9mm; left:18mm; right:18mm; display:flex; justify-content:space-between;
+  font-size:7.2pt; color:var(--muted); border-top:1px solid var(--line); padding-top:2.6mm; }
+
+/* type */
+.kicker{ font-family:var(--head); font-weight:600; font-size:7.8pt; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--gold-deep); margin-bottom:2.6mm; display:flex; align-items:center; gap:2.2mm; }
+.kicker::before{ content:""; width:6mm; height:1.6px; background:var(--gold); }
+h1{ font-family:var(--head); font-weight:600; font-stretch:condensed; font-size:28pt; line-height:1.04; color:var(--ink); margin-bottom:4mm; }
+h3{ font-family:var(--head); font-weight:600; font-size:11pt; }
+.lead{ font-size:10.8pt; line-height:1.5; color:var(--ink2); max-width:158mm; }
+.label{ font-family:var(--head); font-weight:600; font-size:6.9pt; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin-bottom:1.8mm; }
+.section-title{ font-family:var(--head); font-weight:600; font-size:12pt; margin:0 0 3mm; display:flex; align-items:center; gap:2.5mm; }
+.section-title small{ font-family:var(--body); font-weight:400; font-size:8.6pt; color:var(--muted); }
+ul.dots{ list-style:none; }
+ul.dots li{ position:relative; padding-left:3.6mm; margin-bottom:1.5mm; }
+ul.dots li::before{ content:""; position:absolute; left:0; top:.58em; width:1.5mm; height:1.5mm; border-radius:50%; background:var(--c, var(--gold)); }
+.ic{ width:5mm; height:5mm; flex:none; }
+
+/* ---------- cover ---------- */
+.cover{ background:var(--dark); color:#fff; padding:0; }
+.cover .glow{ position:absolute; inset:0;
+  background: radial-gradient(130mm 95mm at 64% 64%, rgba(227,168,43,.16), transparent 70%),
+              radial-gradient(90mm 70mm at 12% 16%, rgba(61,111,224,.12), transparent 70%); }
+.cover .top{ position:absolute; top:13mm; left:18mm; right:18mm; display:flex; justify-content:space-between; align-items:center;
+  font-family:var(--head); font-size:7.6pt; letter-spacing:.2em; text-transform:uppercase; color:#8F96A2; }
+.cover .top .mk{ color:#fff; }
+.cover .title{ position:absolute; top:33mm; left:18mm; right:18mm; }
+.cover .kicker{ color:var(--gold); }
+.cover h1{ color:#fff; font-size:44pt; line-height:.98; margin:1.5mm 0 6mm; }
+.cover h1 span{ color:var(--gold); }
+.cover .lead{ color:#B7BCC6; font-size:12pt; max-width:142mm; }
+.cover .art{ position:absolute; left:7mm; right:7mm; top:111mm; }
+.cover .art svg{ width:100%; height:auto; display:block; }
+.cover .chips{ position:absolute; left:18mm; right:18mm; bottom:25mm; display:grid; grid-template-columns:repeat(3,1fr); gap:3mm; }
+.chip{ border:1px solid #2B3038; border-radius:3mm; padding:3.2mm 4mm; display:flex; align-items:center; gap:3mm; background:rgba(255,255,255,.025); }
+.chip b{ font-family:var(--head); font-size:15pt; font-weight:700; line-height:1; }
+.chip span{ font-size:9pt; color:#D7DAE0; line-height:1.3; }
+.chip span small{ display:block; color:#8F96A2; font-size:7.8pt; }
+.chip.c1 b{ color:var(--gold); } .chip.c2 b{ color:#83A6F4; } .chip.c3 b{ color:#4FCB8C; }
+.cover .foot{ position:absolute; left:18mm; right:18mm; bottom:11mm; display:flex; justify-content:space-between; font-size:7.6pt; color:#767C88; }
+
+/* ---------- page 2: plan ---------- */
+.timeline{ display:grid; grid-template-columns:1fr 6mm 1fr 6mm 1fr; margin:8mm 0 9mm; }
+.stage{ border-radius:3.5mm; overflow:hidden; background:var(--panel); display:flex; flex-direction:column; }
+.stage .top{ padding:4mm 4.5mm 3.4mm; display:flex; align-items:baseline; gap:2.4mm; color:#fff; }
+.stage .num{ font-family:var(--head); font-size:21pt; font-weight:700; line-height:1; }
+.stage .name{ font-family:var(--head); font-size:12.5pt; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.s1 .top{ background:var(--gold); color:#2B1E00; } .s2 .top{ background:var(--demo); } .s3 .top{ background:var(--live); }
+.stage .body{ padding:4mm 4.5mm 3mm; color:var(--ink2); font-size:9.4pt; flex:1; }
+.stage .gate{ margin:0 4.5mm 4.5mm; padding-top:3mm; border-top:1px dashed #CEC6B6; font-size:8.8pt; font-weight:600; color:var(--ink); }
+.stage .gate .label{ margin-bottom:1mm; }
+.tl-arrow{ display:flex; align-items:center; justify-content:center; color:#B9B1A1; }
+.tl-arrow svg{ width:5.5mm; height:5.5mm; }
+
+.parts{ display:grid; grid-template-columns:repeat(5,1fr); gap:3mm; }
+.part{ border:1px solid var(--line); border-radius:3mm; padding:3.6mm 3.4mm; }
+.part .pi{ width:9mm; height:9mm; border-radius:2.4mm; display:grid; place-items:center; margin-bottom:2.6mm; background:var(--panel); color:var(--ink); }
+.part .pi svg{ width:5.4mm; height:5.4mm; }
+.part.robot .pi{ background:var(--gold-soft); color:var(--gold-deep); }
+.part.ai .pi{ background:var(--teal-soft); color:var(--teal); }
+.part h3{ font-size:10.4pt; margin-bottom:1mm; }
+.part p{ font-size:8.4pt; color:var(--ink2); line-height:1.4; }
+
+.callout{ margin-top:9mm; background:var(--dark); color:#E9E7E2; border-radius:4mm; padding:6mm 7mm;
+  display:grid; grid-template-columns:1fr auto; gap:7mm; align-items:center; }
+.callout .label{ color:var(--gold); }
+.callout h3{ font-size:14pt; color:#fff; margin-bottom:1.6mm; font-stretch:condensed; }
+.callout p{ font-size:9.4pt; color:#B7BCC6; }
+.callout .go{ font-family:var(--head); font-size:9pt; letter-spacing:.14em; text-transform:uppercase; color:var(--gold);
+  border:1px solid rgba(227,168,43,.5); border-radius:10mm; padding:2.4mm 4.5mm; white-space:nowrap; }
+
+.today{ margin-top:8mm; }
+.track{ display:grid; grid-template-columns:auto 1fr auto 1fr auto 1fr auto; align-items:start; margin-top:2mm; }
+.track .seg{ height:2px; background:repeating-linear-gradient(90deg, #D8D1C3 0 5px, transparent 5px 9px); margin-top:2.2mm; }
+.track .node{ display:flex; flex-direction:column; align-items:center; text-align:center; min-width:30mm; }
+.track .node i{ width:4.6mm; height:4.6mm; border-radius:50%; border:2px solid #CFC7B8; background:#fff; margin-bottom:1.6mm; }
+.track .node b{ font-family:var(--head); font-weight:600; font-size:9.6pt; }
+.track .node span{ font-size:7.8pt; color:var(--muted); }
+.track .now i{ background:var(--ink); border-color:var(--ink); box-shadow:0 0 0 1.4mm rgba(227,168,43,.35); }
+.track .n1 i{ border-color:var(--gold); } .track .n2 i{ border-color:var(--demo); } .track .n3 i{ border-color:var(--live); }
+
+/* ---------- page 3: stages ---------- */
+.band{ display:grid; grid-template-columns:30mm 1fr; border-radius:3.5mm; overflow:hidden; border:1px solid var(--line); margin-top:4mm; }
+.band .side{ padding:4.6mm 4.2mm; display:flex; flex-direction:column; }
+.band .side .num{ font-family:var(--head); font-weight:700; font-size:30pt; line-height:.9; }
+.band .side .nm{ font-family:var(--head); font-weight:600; font-size:13pt; line-height:1.1; margin-top:2mm; }
+.band .side .sub{ margin-top:auto; font-size:8pt; opacity:.85; line-height:1.35; }
+.b1{ --c:var(--gold); --soft:var(--gold-soft); } .b1 .side{ background:var(--gold); color:#2B1E00; }
+.b2{ --c:var(--demo); --soft:var(--demo-soft); } .b2 .side{ background:var(--demo); color:#fff; }
+.b3{ --c:var(--live); --soft:var(--live-soft); } .b3 .side{ background:var(--live); color:#fff; }
+.band .cols{ display:grid; grid-template-columns:1.4fr .92fr 1.25fr; gap:4mm; padding:4.2mm 4.4mm; font-size:8.7pt; line-height:1.4; color:var(--ink2); }
+.band .cols li{ margin-bottom:1.2mm; }
+.band .gate{ background:var(--soft); border-radius:2.6mm; padding:3mm 3.4mm; color:var(--ink); }
+.band .gate li{ font-weight:600; font-size:8.6pt; }
+.band .gate li.plain{ font-weight:400; }
+.tip{ margin-top:5mm; display:flex; gap:3mm; align-items:flex-start; font-size:9pt; color:var(--ink2); background:var(--panel); border-radius:3mm; padding:3.6mm 4.4mm; }
+.tip b{ color:var(--ink); }
+.blank{ display:inline-block; min-width:9mm; border-bottom:1.2px solid currentColor; text-align:center; }
+
+/* ---------- page 4: system ---------- */
+.diagram{ margin:6mm 0 2mm; }
+.diagram svg{ width:100%; height:auto; display:block; }
+.legend{ display:flex; gap:7mm; font-size:8pt; color:var(--ink2); margin-bottom:6mm; }
+.legend span{ display:flex; align-items:center; gap:2mm; }
+.legend i{ display:inline-block; width:9mm; height:0; border-top:2.4px solid; }
+.legend .l-orders{ border-color:var(--gold); } .legend .l-data{ border-color:#9AA0AA; border-top-width:1.6px; }
+.legend .l-cmd{ border-color:var(--teal); border-top-style:dashed; border-top-width:1.8px; }
+.rules3{ display:grid; grid-template-columns:repeat(3,1fr); gap:3mm; margin-top:6mm; }
+.rule{ background:var(--dark); color:#E9E7E2; border-radius:3mm; padding:4mm; display:flex; gap:3mm; align-items:flex-start; }
+.rule .n{ font-family:var(--head); font-weight:700; color:var(--gold); font-size:15pt; line-height:1; }
+.rule b{ display:block; color:#fff; font-size:9.6pt; margin-bottom:.6mm; }
+.rule span{ font-size:8.3pt; color:#AEB3BD; line-height:1.4; }
+.whyai{ margin-top:5mm; border-left:3px solid var(--teal); background:var(--teal-soft); border-radius:0 3mm 3mm 0; padding:3.6mm 4.6mm; font-size:9pt; color:var(--ink2); }
+.whyai b{ color:var(--ink); }
+
+/* ---------- page 5: decision ---------- */
+.opts{ display:grid; grid-template-columns:1fr 1.12fr; gap:4.5mm; margin-top:5mm; }
+.opt{ border:1px solid var(--line); border-radius:3.5mm; padding:4.6mm 5mm; display:flex; flex-direction:column; }
+.opt.b{ border:1.6px solid var(--gold); background:linear-gradient(180deg, #FFFCF4, #fff 40%); }
+.opt .tag{ align-self:flex-start; font-family:var(--head); font-weight:600; font-size:7pt; letter-spacing:.18em; text-transform:uppercase;
+  padding:1.2mm 2.6mm; border-radius:10mm; background:var(--panel); color:var(--ink2); margin-bottom:2.6mm; }
+.opt.b .tag{ background:var(--gold); color:#2B1E00; }
+.opt h3{ font-size:16pt; font-stretch:condensed; line-height:1.05; }
+.opt .sub{ font-size:9.4pt; color:var(--muted); margin:.8mm 0 3.6mm; }
+.opt ul{ list-style:none; font-size:8.9pt; color:var(--ink2); margin-bottom:3mm; }
+.opt li{ display:flex; gap:2mm; margin-bottom:1.3mm; align-items:flex-start; }
+.opt li svg{ width:3.8mm; height:3.8mm; flex:none; margin-top:.35mm; }
+.opt .yes svg{ color:var(--live); } .opt .noo svg{ color:var(--red); }
+.opt .intro{ font-size:8.9pt; color:var(--ink2); margin-bottom:2.6mm; }
+.btns{ display:grid; grid-template-columns:1fr 1fr; gap:2.2mm; margin-bottom:3mm; }
+.btn{ border:1px solid var(--line); background:#fff; border-radius:2.6mm; padding:2.4mm 2.8mm; display:grid; grid-template-columns:6.2mm 1fr; column-gap:2.2mm; align-items:center; }
+.btn .bi{ grid-row:span 2; width:6.2mm; height:6.2mm; border-radius:1.8mm; display:grid; place-items:center; background:var(--live-soft); color:var(--live); }
+.btn .bi svg{ width:3.6mm; height:3.6mm; }
+.btn.pause .bi{ background:var(--gold-soft); color:var(--gold-deep); }
+.btn.stop .bi{ background:#ECEEF1; color:#4A505C; }
+.btn.flat .bi{ background:var(--red-soft); color:var(--red); }
+.btn b{ font-size:8.9pt; line-height:1.15; }
+.btn span{ font-size:7.6pt; color:var(--muted); line-height:1.25; }
+.meter{ margin-top:auto; display:flex; gap:2.5mm; flex-wrap:wrap; }
+.meter span{ font-size:7.8pt; color:var(--ink2); background:var(--panel); border-radius:10mm; padding:1.1mm 2.8mm; }
+.meter b{ color:var(--ink); }
+
+.flowwrap{ margin-top:5mm; }
+.flow{ display:grid; grid-template-columns:1fr 5mm 1fr 5mm 1fr 5mm 1fr; align-items:stretch; }
+.step{ background:var(--panel); border-radius:3mm; padding:3.4mm 3.4mm 3.2mm; }
+.step .n{ width:5.4mm; height:5.4mm; border-radius:50%; background:var(--teal); color:#fff; font-family:var(--head); font-weight:700;
+  font-size:8pt; display:grid; place-items:center; margin-bottom:2mm; }
+.step b{ display:block; font-size:9pt; line-height:1.2; margin-bottom:.8mm; }
+.step span{ font-size:7.9pt; color:var(--ink2); line-height:1.35; display:block; }
+.step.ok{ background:var(--live-soft); } .step.ok .n{ background:var(--live); }
+.f-arrow{ display:flex; align-items:center; justify-content:center; color:#AFA898; }
+.f-arrow svg{ width:4.4mm; height:4.4mm; }
+.flownote{ margin-top:2.6mm; font-size:8.6pt; color:var(--ink2); display:flex; gap:2mm; align-items:center; }
+.flownote svg{ width:4mm; height:4mm; color:var(--live); flex:none; }
+
+.guard{ display:grid; grid-template-columns:1fr 1fr; gap:2.6mm 5mm; margin-top:3mm; }
+.guard div{ display:flex; gap:2.6mm; font-size:8.8pt; color:var(--ink2); align-items:flex-start; }
+.guard .n{ flex:none; width:5mm; height:5mm; border-radius:1.4mm; background:var(--ink); color:#fff; font-family:var(--head); font-weight:700; font-size:7.8pt; display:grid; place-items:center; margin-top:.2mm; }
+.guard b{ color:var(--ink); }
+.reco{ margin-top:4.6mm; background:var(--dark); border-radius:4mm; padding:4.6mm 6mm; color:#C9CDD5; display:grid; grid-template-columns:auto 1fr; gap:5mm; align-items:center; }
+.reco .badge{ font-family:var(--head); font-weight:600; color:#2B1E00; background:var(--gold); border-radius:2.4mm; padding:2.4mm 3.2mm; font-size:8pt; letter-spacing:.14em; text-transform:uppercase; line-height:1.2; text-align:center; }
+.reco p{ font-size:9.6pt; line-height:1.5; }
+.reco p b{ color:#fff; }
+
+/* ---------- page 6: venue ---------- */
+table{ border-collapse:collapse; width:100%; }
+.venue{ margin-top:6mm; font-size:8.8pt; }
+.venue th{ text-align:left; font-family:var(--head); font-weight:600; font-size:7pt; letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+  padding:0 3mm 2.4mm; border-bottom:1.4px solid var(--ink); }
+.venue td{ padding:3.4mm 3mm; border-bottom:1px solid var(--line); vertical-align:top; color:var(--ink2); }
+.venue td:first-child{ width:40mm; }
+.venue td:first-child b{ display:block; color:var(--ink); font-size:10pt; }
+.venue td:first-child span{ font-size:7.8pt; color:var(--muted); }
+.venue td:nth-child(2){ width:22mm; } .venue td:nth-child(3){ width:30mm; }
+.venue tr.own td{ background:var(--gold-soft); }
+.pill{ display:inline-block; font-family:var(--head); font-weight:600; font-size:7.4pt; letter-spacing:.1em; text-transform:uppercase; border-radius:10mm; padding:1.1mm 2.6mm; white-space:nowrap; }
+.pill.ok{ background:var(--live-soft); color:var(--live-deep); }
+.pill.warn{ background:var(--gold-soft); color:var(--gold-deep); }
+.pill.no{ background:var(--red-soft); color:var(--red); }
+.q{ font-style:italic; color:var(--ink); }
+.strong-no{ color:var(--red); font-weight:600; }
+.means{ margin-top:6mm; display:grid; grid-template-columns:1fr 1fr; gap:4mm; }
+.means > div{ border-radius:3.5mm; padding:4.6mm 5mm; font-size:9.2pt; color:var(--ink2); }
+.means .m1{ background:var(--dark); color:#C9CDD5; }
+.means .m1 b{ color:#fff; }
+.means .m2{ background:var(--panel); }
+.means h3{ font-size:11pt; margin-bottom:1.6mm; }
+.means .m1 h3{ color:var(--gold); }
+
+/* ---------- page 7: costs + rules ---------- */
+.costs{ margin-top:5mm; font-size:8.8pt; }
+.costs th{ text-align:left; font-family:var(--head); font-weight:600; font-size:7pt; letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+  padding:0 3mm 2.2mm; border-bottom:1.4px solid var(--ink); white-space:nowrap; }
+.costs td{ padding:2.5mm 3mm; border-bottom:1px solid var(--line); color:var(--ink2); vertical-align:top; }
+.costs td:first-child{ color:var(--ink); font-weight:600; width:47mm; }
+.costs td:first-child span{ display:block; font-weight:400; font-size:7.8pt; color:var(--muted); }
+.costs td.num{ font-family:var(--head); font-size:10pt; color:var(--ink); white-space:nowrap; }
+.costs td.note{ font-size:7.9pt; color:var(--muted); }
+.costs tr.total td{ border-bottom:none; background:var(--dark); color:#fff; font-weight:600; }
+.costs tr.total td:first-child{ border-radius:2.6mm 0 0 2.6mm; color:#fff; }
+.costs tr.total td:last-child{ border-radius:0 2.6mm 2.6mm 0; color:#AEB3BD; font-weight:400; }
+.costs tr.total td.num{ color:var(--gold); font-size:12pt; }
+.rules{ display:grid; grid-template-columns:1fr 1fr; gap:3mm; margin-top:3mm; }
+.rulebox{ border:1px solid var(--line); border-radius:3mm; padding:3.6mm 4mm; display:flex; gap:3mm; align-items:flex-start; }
+.rulebox .n{ font-family:var(--head); font-weight:700; font-size:14pt; color:var(--gold); line-height:1; min-width:5mm; }
+.rulebox b{ display:block; font-size:9.6pt; margin-bottom:.6mm; }
+.rulebox span{ font-size:8.6pt; color:var(--ink2); line-height:1.45; }
+.fill{ display:inline-block; min-width:14mm; border-bottom:1.3px solid var(--ink); }
+
+/* ---------- page 8: next ---------- */
+.checks{ margin-top:5mm; display:grid; gap:2.4mm; }
+.check{ display:grid; grid-template-columns:6mm 30mm 1fr auto; align-items:center; gap:3mm; border:1px solid var(--line); border-radius:3mm; padding:3.2mm 4mm; }
+.check .box{ width:5mm; height:5mm; border:1.6px solid var(--ink); border-radius:1.2mm; }
+.check b{ font-family:var(--head); font-weight:600; font-size:10.4pt; }
+.check span{ font-size:9pt; color:var(--ink2); }
+.check em{ font-style:normal; font-size:7.6pt; color:var(--muted); font-family:var(--head); letter-spacing:.12em; text-transform:uppercase; }
+.check.done{ background:var(--live-soft); border-color:#CDEBD9; }
+.check.done em{ color:var(--live-deep); }
+.check .box.ok{ background:var(--live); border-color:var(--live); color:#fff; display:grid; place-items:center; }
+.check .box.ok svg{ width:3.6mm; height:3.6mm; }
+.weeks{ display:grid; grid-template-columns:1fr 1fr; gap:4mm; margin-top:4mm; }
+.week{ border-radius:3.5mm; padding:4.6mm 5mm; background:var(--panel); }
+.week .wk{ font-family:var(--head); font-weight:700; font-size:18pt; line-height:1; color:var(--gold-deep); }
+.week .wk small{ font-size:8pt; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin-left:1.6mm; font-weight:600; }
+.week ul{ margin-top:3mm; font-size:9.2pt; color:var(--ink2); }
+.closing{ margin-top:6mm; background:var(--dark); border-radius:4mm; padding:6mm 7mm; display:flex; justify-content:space-between; align-items:center; gap:6mm; }
+.closing h3{ color:#fff; font-size:16pt; font-stretch:condensed; line-height:1.1; }
+.closing h3 span{ color:var(--gold); }
+.closing p{ color:#AEB3BD; font-size:8.8pt; max-width:70mm; }
+.sources{ margin-top:5mm; font-size:7.4pt; color:var(--muted); line-height:1.5; }
+.sources b{ color:var(--ink2); font-weight:600; }
+</style>
+</head>
+<body>
+
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-hex" viewBox="0 0 24 24"><path d="M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z" fill="none" stroke="#E3A82B" stroke-width="2"/><rect x="8" y="9" width="8" height="6.4" rx="1.6" fill="#E3A82B"/><rect x="9.7" y="11.2" width="1.5" height="1.6" fill="#0E1014"/><rect x="12.8" y="11.2" width="1.5" height="1.6" fill="#0E1014"/></symbol>
+    <symbol id="i-robot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1.2"/><circle cx="9.3" cy="13.4" r="1.2" fill="currentColor"/><circle cx="14.7" cy="13.4" r="1.2" fill="currentColor"/><path d="M2.5 12v3.5M21.5 12v3.5"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M8.3 8.3a5.2 5.2 0 0 0 0 7.4M15.7 8.3a5.2 5.2 0 0 1 0 7.4M5.3 5.3a9.4 9.4 0 0 0 0 13.4M18.7 5.3a9.4 9.4 0 0 1 0 13.4"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5.6" rx="7" ry="2.8"/><path d="M5 5.6v12.6c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9V5.6"/><path d="M5 11.9c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9"/></symbol>
+    <symbol id="i-office" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.8l8.4 4.8v9.6L12 22l-8.4-4.8V7.6z"/><path d="M3.6 7.6L12 12.4l8.4-4.8M12 12.4V22"/></symbol>
+    <symbol id="i-ai" viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 3l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6L3 10.5l5.6-1.9z"/><path d="M18.5 14.5l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l4.8 4.8L19.5 7"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7.5 4.8v14.4L19 12z" fill="currentColor"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13" rx="2.4" fill="currentColor"/></symbol>
+    <symbol id="i-flat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="8.6"/><path d="M8.8 8.8l6.4 6.4M15.2 8.8l-6.4 6.4"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.6c0 4.6-3.2 8.2-7.5 9.4-4.3-1.2-7.5-4.8-7.5-9.4V6z"/><path d="M8.6 12.2l2.4 2.4 4.4-4.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.8.6 1.1 1.4 1.1 2.2h5c0-.8.3-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></symbol>
+    <marker id="m-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#E3A82B"/></marker>
+    <marker id="m-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9AA0AA"/></marker>
+    <marker id="m-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1597A8"/></marker>
+  </defs>
+</svg>
+
+<!-- ============================ 1 · COVER ============================ -->
+<section class="page cover">
+  <div class="glow"></div>
+  <div class="top">
+    <span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span>
+    <span>Plan v2 · 24 Sep 2026</span>
+  </div>
+  <div class="title">
+    <div class="kicker">The plan · for discussion</div>
+    <h1>Our robot.<br>Our office.<br><span>Demo first, then live.</span></h1>
+    <p class="lead">We turn the strategy we already trade into a robot, prove it on a demo account, then take it live, and watch every move from our own 3D office.</p>
+  </div>
+  <div class="art"><svg id="office" viewBox="0 0 700 440" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="chips">
+    <div class="chip c1"><b>01</b><span>Build the robot<small>our strategy, as code</small></span></div>
+    <div class="chip c2"><b>02</b><span>Demo account<small>fake money, real market</small></span></div>
+    <div class="chip c3"><b>03</b><span>Live account<small>small first, then scale</small></span></div>
+  </div>
+  <div class="foot"><span>Prepared for discussion</span><span>Rules and prices checked on 23 Sep 2026</span></div>
+</section>
+
+<!-- ============================ 2 · THE PLAN ============================ -->
+<section class="page">
+  <div class="rh"><span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span><span>The plan · 02</span></div>
+
+  <div class="kicker">The plan</div>
+  <h1>Three stages. One robot.<br>No shortcuts.</h1>
+  <p class="lead">Nothing here changes how we trade. The robot follows the rules we already follow. It just never gets tired, never hesitates, and writes down every trade. Real money only comes after it has proven itself on a demo account.</p>
+
+  <div class="timeline">
+    <div class="stage s1">
+      <div class="top"><span class="num">01</span><span class="name">Build</span></div>
+      <div class="body">Turn the strategy we already use into exact rules, code it into a robot, and backtest it on years of data.</div>
+      <div class="gate"><div class="label">Move on when</div>the backtest trades the way we do.</div>
+    </div>
+    <div class="tl-arrow"><svg><use href="#i-arrow"/></svg></div>
+    <div class="stage s2">
+      <div class="top"><span class="num">02</span><span class="name">Demo</span></div>
+      <div class="body">The robot trades a demo account from our own PC (fake money, real prices) while we watch and control it from the office.</div>
+      <div class="gate"><div class="label">Move on when</div>weeks of demo match the backtest.</div>
+    </div>
+    <div class="tl-arrow"><svg><use href="#i-arrow"/></svg></div>
+    <div class="stage s3">
+      <div class="top"><span class="num">03</span><span class="name">Live</span></div>
+      <div class="body">Same robot, same code, real account. Smallest size first; it earns every step up.</div>
+      <div class="gate"><div class="label">Scale up when</div>live keeps matching demo.</div>
+    </div>
+  </div>
+
+  <div class="section-title">What we're building <small>five parts, and only the first one trades</small></div>
+  <div class="parts">
+    <div class="part robot"><div class="pi"><svg><use href="#i-robot"/></svg></div><h3>Robot</h3><p>Trades our strategy, exactly as written.</p></div>
+    <div class="part"><div class="pi"><svg><use href="#i-signal"/></svg></div><h3>Reporter</h3><p>Tells the database what the account is doing.</p></div>
+    <div class="part"><div class="pi"><svg><use href="#i-db"/></svg></div><h3>Database</h3><p>Remembers every trade, position and heartbeat.</p></div>
+    <div class="part"><div class="pi"><svg><use href="#i-office"/></svg></div><h3>3D office</h3><p>Shows it all live, plus phone alerts.</p></div>
+    <div class="part ai"><div class="pi"><svg><use href="#i-ai"/></svg></div><h3>AI helpers</h3><p>Explain and warn. They never trade.</p></div>
+  </div>
+
+  <div class="callout">
+    <div>
+      <div class="label">Decided</div>
+      <h3>The office watches, and gives orders.</h3>
+      <p>Four buttons on every robot: Start, Pause, Done for today, Close everything. Nobody places trades from the office. It only tells a robot when to work.</p>
+    </div>
+    <div class="go">See page 5 →</div>
+  </div>
+
+  <div class="today">
+    <div class="label">Where we are today</div>
+    <div class="track">
+      <div class="node now"><i></i><b>Plan</b><span>we are here</span></div>
+      <div class="seg"></div>
+      <div class="node n1"><i></i><b>01 Build</b><span>after page 8's questions</span></div>
+      <div class="seg"></div>
+      <div class="node n2"><i></i><b>02 Demo</b><span>weeks, not days</span></div>
+      <div class="seg"></div>
+      <div class="node n3"><i></i><b>03 Live</b><span>smallest size first</span></div>
+    </div>
+  </div>
+
+  <div class="rf"><span>Our Trading Office · the plan</span><span>2 / 8</span></div>
+</section>
+
+<!-- ============================ 3 · STAGE BY STAGE ============================ -->
+<section class="page">
+  <div class="rh"><span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span><span>Stage by stage · 03</span></div>
+
+  <div class="kicker">Stage by stage</div>
+  <h1>What happens, and when we move on.</h1>
+
+  <div class="band b1">
+    <div class="side"><div class="num">01</div><div class="nm">Build<br>the robot</div><div class="sub">Our strategy becomes code.</div></div>
+    <div class="cols">
+      <div><div class="label">What happens</div>
+        <ul class="dots">
+          <li>Write the strategy on one page: entry, stop, exit, size, trading hours, and the days we skip (news).</li>
+          <li>Code it with safety built in: a stop on every trade, max size, a daily loss limit, flat before the session ends, and a pause switch.</li>
+          <li>Backtest it on several years of data.</li>
+        </ul></div>
+      <div><div class="label">What we need</div>
+        <ul class="dots">
+          <li>The platform: MetaTrader 5 or NinjaTrader 8</li>
+          <li>Our rules, written down</li>
+          <li>Historical data (comes with the platform)</li>
+        </ul></div>
+      <div class="gate"><div class="label">We move on when</div>
+        <ul class="dots">
+          <li>The backtest trades like we do (win rate, average win and loss, number of trades) in good and bad periods.</li>
+          <li>We both understand every rule.</li>
+        </ul></div>
+    </div>
+  </div>
+
+  <div class="band b2">
+    <div class="side"><div class="num">02</div><div class="nm">Demo<br>account</div><div class="sub">Fake money, real market.</div></div>
+    <div class="cols">
+      <div><div class="label">What happens</div>
+        <ul class="dots">
+          <li>The robot runs on our own PC, set up to stay on. For the last 1–2 weeks it moves to a VPS, so the move happens on fake money.</li>
+          <li>A small reporter sends every trade, open position and a heartbeat (every 30 s) to our database.</li>
+          <li>We watch it in the office, get phone alerts, and compare demo with the backtest weekly.</li>
+        </ul></div>
+      <div><div class="label">What we need</div>
+        <ul class="dots">
+          <li>A demo account (free)</li>
+          <li>Our PC: no sleep, no surprise restarts</li>
+          <li>A VPS for the final weeks ($12–30 a month)</li>
+        </ul></div>
+      <div class="gate"><div class="label">We move on when</div>
+        <ul class="dots">
+          <li><span class="blank">&nbsp;</span> weeks of demo (we pick 4–8) track the backtest.</li>
+          <li>Every button has been tested on demo.</li>
+          <li>The final weeks on the VPS ran without problems.</li>
+          <li>Kill rules for live are written down (page 7).</li>
+        </ul></div>
+    </div>
+  </div>
+
+  <div class="band b3">
+    <div class="side"><div class="num">03</div><div class="nm">Live<br>account</div><div class="sub">Small first, then scale.</div></div>
+    <div class="cols">
+      <div><div class="label">What happens</div>
+        <ul class="dots">
+          <li>Same robot, same code. Only the account changes.</li>
+          <li>Start at the smallest size. The office, alerts and AI reports stay exactly the same.</li>
+          <li>A 30-minute weekly review comparing live, demo and backtest.</li>
+        </ul></div>
+      <div><div class="label">What we need</div>
+        <ul class="dots">
+          <li>A live account: our own capital, or a prop firm that allows robots (page 6)</li>
+          <li>The kill rules</li>
+        </ul></div>
+      <div class="gate"><div class="label">Scale up / switch off</div>
+        <ul class="dots">
+          <li>Scale up when live matches demo for an agreed period.</li>
+          <li>Switch off when any kill rule triggers. No debating it in the moment.</li>
+        </ul></div>
+    </div>
+  </div>
+
+  <div class="tip"><svg class="ic" style="color:var(--gold-deep)"><use href="#i-bulb"/></svg>
+    <div><b>The first thing stage 01 tells us:</b> if a rule can't be written down, a robot can't trade it. Writing the one-page rules shows us which parts of our trading are really rules, and which are gut feel.</div></div>
+
+  <div class="rf"><span>Our Trading Office · the plan</span><span>3 / 8</span></div>
+</section>
+
+<!-- ============================ 4 · THE SYSTEM ============================ -->
+<section class="page">
+  <div class="rh"><span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span><span>How it fits together · 04</span></div>
+
+  <div class="kicker">How it fits together</div>
+  <h1>Five parts.<br>Only one of them trades.</h1>
+  <p class="lead">Every part talks to one shared database, never directly to each other. That keeps the robot simple, and makes everything around it safe to build and change.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 660 292" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+      <!-- market -->
+      <rect x="0" y="92" width="84" height="84" rx="10" fill="#F7F4EE" stroke="#E6E1D7"/>
+      <text x="42" y="126" text-anchor="middle" font-family="Bahnschrift" font-weight="600" font-size="12" letter-spacing="1.2" fill="#15171C">MARKET</text>
+      <text x="42" y="144" text-anchor="middle" font-size="9.5" fill="#7B818D">broker or</text>
+      <text x="42" y="157" text-anchor="middle" font-size="9.5" fill="#7B818D">exchange</text>
+      <!-- orders -->
+      <line x1="87" y1="112" x2="137" y2="112" stroke="#E3A82B" stroke-width="3.2" marker-start="url(#m-gold)" marker-end="url(#m-gold)"/>
+      <text x="112" y="104" text-anchor="middle" font-family="Bahnschrift" font-weight="600" font-size="9.5" fill="#8F6106">orders</text>
+      <!-- vps container -->
+      <rect x="124" y="6" width="190" height="280" rx="14" fill="none" stroke="#CEC6B6" stroke-dasharray="4 4"/>
+      <text x="138" y="25" font-family="Bahnschrift" font-weight="600" font-size="8.5" letter-spacing="1.4" fill="#7B818D">OUR PC · LATER A VPS</text>
+      <!-- robot -->
+      <rect x="138" y="38" width="162" height="100" rx="10" fill="#FBF1DA" stroke="#E3A82B" stroke-width="1.6"/>
+      <svg x="150" y="50" width="26" height="26" color="#8F6106"><use href="#i-robot"/></svg>
+      <text x="184" y="62" font-family="Bahnschrift" font-weight="700" font-size="13" fill="#15171C">ROBOT</text>
+      <text x="184" y="78" font-size="9.5" fill="#3F4551">trades our strategy</text>
+      <text x="184" y="92" font-size="9" fill="#7B818D">MT5 or NinjaTrader 8</text>
+      <rect x="150" y="108" width="138" height="18" rx="9" fill="#E3A82B"/>
+      <text x="219" y="120.5" text-anchor="middle" font-family="Bahnschrift" font-weight="600" font-size="8.3" letter-spacing=".8" fill="#2B1E00">THE ONLY PART THAT TRADES</text>
+      <!-- reporter -->
+      <line x1="219" y1="138" x2="219" y2="174" stroke="#C7C1B4" stroke-width="1.4"/>
+      <text x="226" y="160" font-size="8.5" fill="#7B818D">reads the account</text>
+      <rect x="138" y="174" width="162" height="96" rx="10" fill="#FFFFFF" stroke="#E6E1D7" stroke-width="1.2"/>
+      <svg x="150" y="186" width="26" height="26" color="#3F4551"><use href="#i-signal"/></svg>
+      <text x="184" y="198" font-family="Bahnschrift" font-weight="700" font-size="13" fill="#15171C">REPORTER</text>
+      <text x="184" y="214" font-size="9.5" fill="#3F4551">sends what the account</text>
+      <text x="184" y="227" font-size="9.5" fill="#3F4551">is doing</text>
+      <text x="184" y="244" font-size="9" fill="#7B818D">heartbeat every 30 s</text>
+      <!-- reporter -> db -->
+      <path d="M300 222 C 336 222, 338 176, 368 176" fill="none" stroke="#9AA0AA" stroke-width="1.8" marker-end="url(#m-gray)"/>
+      <text x="340" y="244" text-anchor="middle" font-size="8.5" fill="#7B818D">trades ·</text>
+      <text x="340" y="256" text-anchor="middle" font-size="8.5" fill="#7B818D">positions ·</text>
+      <text x="340" y="268" text-anchor="middle" font-size="8.5" fill="#7B818D">heartbeat</text>
+      <!-- database -->
+      <path d="M372 100 v88 a52 12 0 0 0 104 0 v-88" fill="#1B1E24"/>
+      <ellipse cx="424" cy="100" rx="52" ry="12" fill="#2C313A"/>
+      <text x="424" y="140" text-anchor="middle" font-family="Bahnschrift" font-weight="700" font-size="12.5" letter-spacing="1" fill="#FFFFFF">DATABASE</text>
+      <text x="424" y="157" text-anchor="middle" font-size="9.5" fill="#B7BCC6">remembers</text>
+      <text x="424" y="170" text-anchor="middle" font-size="9.5" fill="#B7BCC6">everything</text>
+      <text x="424" y="188" text-anchor="middle" font-family="Bahnschrift" font-size="9" letter-spacing="1" fill="#E3A82B">SUPABASE</text>
+      <!-- db -> office / ai -->
+      <path d="M478 124 C 500 124, 500 86, 520 86" fill="none" stroke="#9AA0AA" stroke-width="1.8" marker-end="url(#m-gray)"/>
+      <path d="M478 172 C 500 172, 500 210, 520 210" fill="none" stroke="#9AA0AA" stroke-width="1.8" marker-end="url(#m-gray)"/>
+      <!-- office -->
+      <rect x="520" y="18" width="140" height="112" rx="10" fill="#0E1014"/>
+      <svg x="532" y="28" width="24" height="24" color="#E3A82B"><use href="#i-office"/></svg>
+      <text x="532" y="72" font-family="Bahnschrift" font-weight="700" font-size="12.5" fill="#FFFFFF">3D OFFICE</text>
+      <text x="532" y="87" font-family="Bahnschrift" font-weight="700" font-size="12.5" fill="#FFFFFF">&amp; DASHBOARD</text>
+      <text x="532" y="104" font-size="9.2" fill="#B7BCC6">see everything live</text>
+      <text x="532" y="118" font-size="9.2" fill="#E3A82B">+ phone alerts</text>
+      <!-- ai -->
+      <rect x="520" y="164" width="140" height="112" rx="10" fill="#E2F4F6" stroke="#BFE3E8"/>
+      <svg x="532" y="174" width="24" height="24" color="#1597A8"><use href="#i-ai"/></svg>
+      <text x="532" y="218" font-family="Bahnschrift" font-weight="700" font-size="12.5" fill="#15171C">AI HELPERS</text>
+      <text x="532" y="235" font-size="9.2" fill="#3F4551">explain &amp; warn</text>
+      <text x="532" y="249" font-size="9.2" font-weight="600" fill="#C9433E">never trade</text>
+      <!-- ai -> office -->
+      <line x1="566" y1="163" x2="566" y2="134" stroke="#9AA0AA" stroke-width="1.8" marker-end="url(#m-gray)"/>
+      <text x="574" y="152" font-size="8.5" fill="#7B818D">reports &amp; alerts</text>
+      <!-- commands (option B) -->
+      <path d="M519 44 C 470 44, 436 56, 430 86" fill="none" stroke="#1597A8" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#m-teal)"/>
+      <path d="M404 89 C 392 62, 340 58, 303 58" fill="none" stroke="#1597A8" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#m-teal)"/>
+      <text x="468" y="34" text-anchor="middle" font-family="Bahnschrift" font-weight="600" font-size="9" fill="#1597A8">commands · option B</text>
+      <text x="352" y="50" text-anchor="middle" font-size="8.5" fill="#1597A8">“may I trade?”</text>
+    </svg>
+  </div>
+  <div class="legend">
+    <span><i class="l-orders"></i>orders: only the robot</span>
+    <span><i class="l-data"></i>information</span>
+    <span><i class="l-cmd"></i>commands: Start, Pause, Done, Close (option B, decided)</span>
+  </div>
+
+  <div class="parts">
+    <div class="part robot"><div class="pi"><svg><use href="#i-robot"/></svg></div><h3>Robot</h3><p>Runs our strategy on MetaTrader 5 or NinjaTrader 8. The only part that can open or close a trade.</p></div>
+    <div class="part"><div class="pi"><svg><use href="#i-signal"/></svg></div><h3>Reporter</h3><p>A tiny add-on next to the robot. Sends trades, positions, balance and a heartbeat.</p></div>
+    <div class="part"><div class="pi"><svg><use href="#i-db"/></svg></div><h3>Database</h3><p>Keeps every trade and snapshot and pushes live updates. Supabase, free to start.</p></div>
+    <div class="part"><div class="pi"><svg><use href="#i-office"/></svg></div><h3>3D office</h3><p>Built on the open-source Claw3D project, plus P&amp;L panels and phone alerts.</p></div>
+    <div class="part ai"><div class="pi"><svg><use href="#i-ai"/></svg></div><h3>AI helpers</h3><p>Claude agents: daily reports, risk warnings, and answers to “why did we lose today?”</p></div>
+  </div>
+
+  <div class="rules3">
+    <div class="rule"><div class="n">1</div><div><b>Only the robot trades.</b><span>Everything else reads. The most it can do is ask the robot to pause.</span></div></div>
+    <div class="rule"><div class="n">2</div><div><b>Everything has a heartbeat.</b><span>If a part goes quiet for 2 minutes, we get an alert.</span></div></div>
+    <div class="rule"><div class="n">3</div><div><b>Passwords stay put.</b><span>Trading logins never leave the trading computer.</span></div></div>
+  </div>
+
+  <div class="whyai"><b>Why the AI doesn't trade:</b> in Alpha Arena (Oct–Nov 2025), AI models each traded $10,000 of real money, and most lost. The organiser's verdict: <i>“LLMs can't really make money by themselves.”</i> So our rules do the trading. The AI explains and warns.</div>
+
+  <div class="rf"><span>Our Trading Office · the plan</span><span>4 / 8</span></div>
+</section>
+
+<!-- ============================ 5 · THE DECISION ============================ -->
+<section class="page">
+  <div class="rh"><span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span><span>Decided · 05</span></div>
+
+  <div class="kicker">Decided: option B</div>
+  <h1>The office watches,<br>and gives orders.</h1>
+  <p class="lead">Nobody places trades from the office. It tells a robot <b>when to work</b>, and the robot confirms every order it receives.</p>
+
+  <div class="opts">
+    <div class="opt a" style="opacity:.62">
+      <span class="tag">Option A · not chosen</span>
+      <h3>Watch only</h3>
+      <p class="sub">The office is a window.</p>
+      <div class="label">We can</div>
+      <ul class="yes">
+        <li><svg><use href="#i-check"/></svg><span>See every robot live: at its desk means in a trade, in the lounge means waiting.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>P&amp;L, open positions, history and health.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Ask the AI about any robot.</span></li>
+      </ul>
+      <div class="label">We can't</div>
+      <ul class="noo">
+        <li><svg><use href="#i-x"/></svg><span>Change anything from the office. To stop a robot, we log into the VPS.</span></li>
+      </ul>
+      <div class="meter"><span>Effort <b>Low</b></span><span>Risk <b>Very low</b></span></div>
+    </div>
+    <div class="opt b">
+      <span class="tag">Option B · our choice</span>
+      <h3>Watch + command</h3>
+      <p class="sub">The office is a control room.</p>
+      <p class="intro">Everything in A, plus four buttons on every robot:</p>
+      <div class="btns">
+        <div class="btn"><div class="bi"><svg><use href="#i-play"/></svg></div><b>Start</b><span>may take new trades</span></div>
+        <div class="btn pause"><div class="bi"><svg><use href="#i-pause"/></svg></div><b>Pause</b><span>finish open trades, no new ones</span></div>
+        <div class="btn stop"><div class="bi"><svg><use href="#i-stop"/></svg></div><b>Done for today</b><span>off until the next session</span></div>
+        <div class="btn flat"><div class="bi"><svg><use href="#i-flat"/></svg></div><b>Close everything</b><span>flatten now · double confirm</span></div>
+      </div>
+      <div class="meter"><span>Effort <b>Medium</b></span><span>Risk <b>Low, if built right</b></span></div>
+    </div>
+  </div>
+
+  <div class="flowwrap">
+    <div class="section-title">How a command travels <small>e.g. pausing Robot 01</small></div>
+    <div class="flow">
+      <div class="step"><div class="n">1</div><b>We press Pause</b><span>on Robot 01, in the office</span></div>
+      <div class="f-arrow"><svg><use href="#i-arrow"/></svg></div>
+      <div class="step"><div class="n">2</div><b>Database saves it</b><span>who pressed it, what, and when</span></div>
+      <div class="f-arrow"><svg><use href="#i-arrow"/></svg></div>
+      <div class="step"><div class="n">3</div><b>Robot checks and obeys</b><span>every few seconds, before any new trade</span></div>
+      <div class="f-arrow"><svg><use href="#i-arrow"/></svg></div>
+      <div class="step ok"><div class="n">4</div><b>Robot confirms</b><span>the office shows it as paused</span></div>
+    </div>
+    <div class="flownote"><svg><use href="#i-shield"/></svg>If the office or the internet goes down, the robot simply keeps following its own built-in rules.</div>
+  </div>
+
+  <div class="section-title" style="margin-top:5mm">Guardrails for option B</div>
+  <div class="guard">
+    <div><span class="n">1</span><span><b>Buttons can only start, pause, stop or close.</b> They can never open a trade or raise a limit.</span></div>
+    <div><span class="n">2</span><span><b>The robot's own limits always win</b> over any button.</span></div>
+    <div><span class="n">3</span><span><b>Every press needs a login and a confirmation,</b> and is logged with who and when.</span></div>
+    <div><span class="n">4</span><span><b>Check the venue's rules.</b> At Topstep, a remote “close everything” may count as sending an order.</span></div>
+  </div>
+
+  <div class="reco">
+    <div class="badge">How we<br>build it</div>
+    <p><b>The buttons come first.</b> The command loop is the first thing we build, on a test robot, before the strategy exists. Every button then gets weeks of testing on demo, so by the time real money is involved, we already trust them.</p>
+  </div>
+
+  <div class="rf"><span>Our Trading Office · the plan</span><span>5 / 8</span></div>
+</section>
+
+<!-- ============================ 6 · WHERE WE TRADE ============================ -->
+<section class="page">
+  <div class="rh"><span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span><span>Where we trade · 06</span></div>
+
+  <div class="kicker">Where we trade</div>
+  <h1>Where the robot trades<br>decides what's allowed.</h1>
+  <p class="lead">On our own capital, brokers generally allow robots. Prop firms each set their own rules, and some ban robots completely. We checked each firm's own rules page on 23 Sep 2026.</p>
+
+  <table class="venue">
+    <thead><tr><th>Where</th><th>Robots</th><th>On a VPS?</th><th>What to know</th></tr></thead>
+    <tbody>
+      <tr class="own"><td><b>Our own capital</b><span>MetaTrader 5 · e.g. forex, gold</span></td><td><span class="pill ok">Allowed</span></td><td>Yes</td><td>Full control of the robot and the account. Check the broker's terms for any banned strategies. It's our own money at risk.</td></tr>
+      <tr><td><b>Lucid Trading</b><span>futures · NinjaTrader, Tradovate</span></td><td><span class="pill ok">Allowed</span></td><td>Not stated</td><td>Robots and trade copiers are allowed. High-frequency trading and micro-scalping are banned. Accounts left untraded for 30 days are deleted.</td></tr>
+      <tr><td><b>MyFundedFutures</b><span>futures</span></td><td><span class="pill ok">Allowed</span></td><td>Not stated</td><td>Our own automation is allowed. No high-frequency trading, and no copying other traders.</td></tr>
+      <tr><td><b>Topstep</b><span>futures · TopstepX</span></td><td><span class="pill warn">API only</span></td><td><span class="strong-no">No.</span> Orders must come from our own computer.</td><td>Robots go through their API: $29 a month, $14.50 with their code. A server may watch and record, but it can't send orders.</td></tr>
+      <tr><td><b>Take Profit Trader</b><span>futures</span></td><td><span class="pill no">Banned</span></td><td>n/a</td><td>Their rule #1: <span class="q">“No Trading Bots or Algos.”</span></td></tr>
+      <tr><td><b>Apex Trader Funding</b><span>futures</span></td><td><span class="pill no">Banned</span></td><td>n/a</td><td><span class="q">“No Automation or Algorithm Usage allowed.”</span> Breaking it risks account closure and lost payouts.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="means">
+    <div class="m1"><h3>What this means for us</h3>On our own capital with MetaTrader 5, the plan works exactly as written. If we go the prop-firm route for futures, we <b>pick a firm that allows robots</b> (Lucid, MyFundedFutures, or Topstep's API), and never run the robot at Apex or Take Profit Trader.</div>
+    <div class="m2"><h3>Before paying for anything</h3>Rules change often, and review sites regularly contradict the official pages. Before we buy an evaluation, we re-read that firm's own rules page, and keep a screenshot with the date.</div>
+  </div>
+
+  <div class="rf"><span>Our Trading Office · the plan</span><span>6 / 8</span></div>
+</section>
+
+<!-- ============================ 7 · COSTS & RULES ============================ -->
+<section class="page">
+  <div class="rh"><span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span><span>Costs &amp; rules · 07</span></div>
+
+  <div class="kicker">Costs &amp; rules</div>
+  <h1>Cheap to run.<br>Strict before real money.</h1>
+
+  <table class="costs">
+    <thead><tr><th>Part</th><th>Demo stage</th><th>Live stage</th><th>Good to know</th></tr></thead>
+    <tbody>
+      <tr><td>VPS<span>always-on Windows computer</span></td><td class="num">$0 → $12–30</td><td class="num">$12–30</td><td class="note">Demo runs on our own PC; the VPS starts in the final 1–2 weeks. Futures near Chicago: $30–100. At Topstep the robot stays on our own PC.</td></tr>
+      <tr><td>Trading platform<span>MetaTrader 5 or NinjaTrader 8</span></td><td class="num">free</td><td class="num">free</td><td class="note">NinjaTrader's paid plans ($99/month or $1,499 once) only lower commissions.</td></tr>
+      <tr><td>Database<span>Supabase</span></td><td class="num">free</td><td class="num">free → $25</td><td class="note">The free tier pauses after a week with no traffic. Our heartbeats keep it awake.</td></tr>
+      <tr><td>3D office<span>Claw3D, open source (MIT)</span></td><td class="num">free</td><td class="num">free</td><td class="note">We host it ourselves, privately.</td></tr>
+      <tr><td>Web hosting<span>Vercel</span></td><td class="num">free</td><td class="num">free</td><td class="note">Free for personal use only. Selling it to others would need a paid plan.</td></tr>
+      <tr><td>AI helpers<span>Claude</span></td><td class="num">a few $</td><td class="num">a few $</td><td class="note">Pay per use, and it only runs when something happens (our estimate).</td></tr>
+      <tr><td>Phone alerts<span>Telegram bot</span></td><td class="num">free</td><td class="num">free</td><td class="note"></td></tr>
+      <tr class="total"><td>Total per month</td><td class="num">≈ $0–35</td><td class="num">≈ $15–60</td><td>≈ $0–5 while the robot runs on our PC. Plus capital or an evaluation fee.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="section-title" style="margin-top:8mm">Rules we agree before any real money <small>we fill in the numbers together</small></div>
+  <div class="rules">
+    <div class="rulebox"><div class="n">1</div><div><b>Daily loss limit</b><span>If the day's loss reaches <span class="fill">&nbsp;</span>, the robot stops until tomorrow.</span></div></div>
+    <div class="rulebox"><div class="n">2</div><div><b>Max drawdown</b><span>Switch the robot off if we're down <span class="fill">&nbsp;</span> from the peak (e.g. 1.5× its worst backtest drawdown).</span></div></div>
+    <div class="rulebox"><div class="n">3</div><div><b>Size steps</b><span>Start at <span class="fill">&nbsp;</span>. Step up only after <span class="fill">&nbsp;</span> weeks of live results that match demo.</span></div></div>
+    <div class="rulebox"><div class="n">4</div><div><b>Hands off</b><span>We never override a trade by hand. We only pause or stop the robot.</span></div></div>
+    <div class="rulebox"><div class="n">5</div><div><b>Changes go through demo</b><span>Every change to the robot runs on demo first. Nothing goes straight to live.</span></div></div>
+    <div class="rulebox"><div class="n">6</div><div><b>Weekly review</b><span>30 minutes: live against demo against backtest. Decisions get written down.</span></div></div>
+  </div>
+
+  <div class="rf"><span>Our Trading Office · the plan</span><span>7 / 8</span></div>
+</section>
+
+<!-- ============================ 8 · NEXT ============================ -->
+<section class="page">
+  <div class="rh"><span class="mk"><svg><use href="#i-hex"/></svg>Trading Office</span><span>Next steps · 08</span></div>
+
+  <div class="kicker">Next steps</div>
+  <h1>What we decide together,<br>then we build.</h1>
+
+  <div class="checks">
+    <div class="check"><div class="box"></div><b>Platform</b><span>MetaTrader 5 (forex, gold) or NinjaTrader 8 (futures)?</span><em></em></div>
+    <div class="check"><div class="box"></div><b>Venue</b><span>Our own capital, or a prop firm that allows robots?</span><em>page 6</em></div>
+    <div class="check done"><div class="box ok"><svg><use href="#i-check"/></svg></div><b>Office</b><span>Watch + command: Start, Pause, Done for today, Close everything.</span><em>decided</em></div>
+    <div class="check done"><div class="box ok"><svg><use href="#i-check"/></svg></div><b>Where it runs</b><span>Our PC for demo, a VPS for the final weeks and for live.</span><em>decided</em></div>
+    <div class="check"><div class="box"></div><b>Demo</b><span>How many weeks, and which numbers mean “passed”?</span><em>page 3</em></div>
+    <div class="check"><div class="box"></div><b>Kill rules</b><span>Our numbers for daily loss, drawdown and size steps.</span><em>page 7</em></div>
+    <div class="check"><div class="box"></div><b>Who does what</b><span>Strategy rules, robot code, office, testing and reviews.</span><em></em></div>
+  </div>
+
+  <div class="section-title" style="margin-top:8mm">The first two weeks</div>
+  <div class="weeks">
+    <div class="week"><div class="wk">01<small>week one</small></div>
+      <ul class="dots">
+        <li>Pick the platform and open a demo account.</li>
+        <li>Fill in the strategy card: our rules on one page.</li>
+        <li>Create the database and the phone-alert bot.</li>
+      </ul></div>
+    <div class="week"><div class="wk">02<small>week two</small></div>
+      <ul class="dots">
+        <li>All four buttons working from the phone, on a test robot.</li>
+        <li>Alerts tested: unplug the internet, get a message.</li>
+        <li>Robot v0 coded from the card, first backtest run.</li>
+      </ul></div>
+  </div>
+
+  <div class="closing">
+    <h3>Answer the five open questions,<br><span>and we start building.</span></h3>
+    <p>Everything in this plan starts on a demo account. Real money is the last step, not the first.</p>
+  </div>
+
+  <div class="sources"><b>Sources, checked 23 Sep 2026:</b> Claw3D on GitHub (github.com/iamlukethedev/Claw3D) · official rules pages of Apex Trader Funding, Take Profit Trader, MyFundedFutures, Lucid Trading and Topstep · pricing pages of Supabase, Vercel, NinjaTrader and QuantVPS · Alpha Arena Season 1 results (nof1). This is our build plan, not financial advice. Full research notes are available on request.</div>
+
+  <div class="rf"><span>Our Trading Office · the plan</span><span>8 / 8</span></div>
+</section>
+
+<script>
+/* Isometric office for the cover, drawn from simple boxes. */
+(function(){
+  const svg = document.getElementById('office');
+  const NS = 'http://www.w3.org/2000/svg';
+  const S = 25, OX = 346, OY = 132, C = 0.8660254;
+  const P = (x,y,z) => [(x - y) * S * C + OX, (x + y) * S * 0.5 - z * S + OY];
+  const fmt = pts => pts.map(p => P(p[0],p[1],p[2]).map(n => n.toFixed(1)).join(',')).join(' ');
+  function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+  function poly(pts, fill, extra){ return el('polygon', Object.assign({ points: fmt(pts), fill: fill }, extra || {})); }
+  function rgb(h){ h = h.replace('#',''); return [0,2,4].map(i => parseInt(h.substr(i,2),16)); }
+  function shade(h, f){ const c = rgb(h).map(v => Math.max(0, Math.min(255, Math.round(v * f)))); return 'rgb(' + c.join(',') + ')'; }
+  function box(x,y,z,w,d,h,col,o){
+    o = o || {};
+    poly([[x,y+d,z],[x+w,y+d,z],[x+w,y+d,z+h],[x,y+d,z+h]], o.left  || shade(col, 0.88));
+    poly([[x+w,y,z],[x+w,y+d,z],[x+w,y+d,z+h],[x+w,y,z+h]], o.right || shade(col, 0.70));
+    poly([[x,y,z+h],[x+w,y,z+h],[x+w,y+d,z+h],[x,y+d,z+h]], o.top   || shade(col, 1.10));
+  }
+  function line(a, b, stroke, width, extra){ const p = P(...a), q = P(...b);
+    return el('line', Object.assign({ x1:p[0], y1:p[1], x2:q[0], y2:q[1], stroke:stroke, 'stroke-width':width || 1, 'stroke-linecap':'round' }, extra || {})); }
+  // plane transforms: y-plane (u = x, v = -z), x-plane (u = -y, v = -z), floor (u = x, v = y)
+  const mY = y0 => `matrix(${S*C},${S*0.5},0,${S},${OX - y0*S*C},${OY + y0*S*0.5})`;
+  const mX = x0 => `matrix(${S*C},${-S*0.5},0,${S},${OX + x0*S*C},${OY + x0*S*0.5})`;
+  const mF = z0 => `matrix(${S*C},${S*0.5},${-S*C},${S*0.5},${OX},${OY - z0*S})`;
+
+  const W = 13, D = 10, H = 4.6, GOLD = '#E3A82B', GREEN = '#3DDC84';
+
+  // floor
+  box(0, 0, -0.35, W, D, 0.35, '#2B3038', { top:'#262B32', left:'#1C2026', right:'#16191E' });
+  for (let i = 1; i < W; i++) line([i,0,0],[i,D,0],'rgba(255,255,255,0.045)',1);
+  for (let j = 1; j < D; j++) line([0,j,0],[W,j,0],'rgba(255,255,255,0.045)',1);
+  // lounge rug + floor lettering
+  poly([[0.7,6.1,0.002],[5.7,6.1,0.002],[5.7,9.8,0.002],[0.7,9.8,0.002]], 'rgba(227,168,43,0.07)', { stroke:'rgba(227,168,43,0.45)', 'stroke-width':1, 'stroke-dasharray':'5 4' });
+  const fl = el('g', { transform: mF(0.003) });
+  el('text', { x:1.15, y:9.62, 'font-family':'Bahnschrift', 'font-weight':'600', 'font-size':0.5, 'letter-spacing':0.16, fill:'rgba(227,168,43,0.8)' }, fl).textContent = 'LOUNGE';
+
+  // walls
+  box(-0.3,-0.3,0,0.3,0.3,H,'#20242B');
+  box(-0.3,0,0,0.3,D,H,'#191C22',{ right:'#1B1E24', top:'#2F343D', left:'#14171C' });
+  box(0,-0.3,0,W,0.3,H,'#20242B',{ left:'#22262D', top:'#2F343D', right:'#15181D' });
+  // gold trims
+  line([0,0,0.14],[W,0,0.14],GOLD,1.6); line([0,0,0.14],[0,D,0.14],GOLD,1.6);
+  line([0,0,H],[W,0,H],GOLD,1.4,{ opacity:0.8 }); line([0,0,H],[0,D,H],GOLD,1.4,{ opacity:0.8 });
+  line([W,0,0],[W,D,0],GOLD,1.3,{ opacity:0.7 }); line([0,D,0],[W,D,0],GOLD,1.3,{ opacity:0.7 });
+
+  // big wall screen (right wall, plane y = 0)
+  poly([[5.0,0.02,1.75],[11.9,0.02,1.75],[11.9,0.02,4.05],[5.0,0.02,4.05]], '#0A0C0F', { stroke:'#3A404B', 'stroke-width':1 });
+  const sc = el('g', { transform: mY(0.03) });
+  el('text', { x:5.35, y:-3.62, 'font-family':'Bahnschrift', 'font-weight':'600', 'font-size':0.3, 'letter-spacing':0.05, fill:'#8F96A2' }, sc).textContent = 'DEMO ACCOUNT · EQUITY';
+  el('text', { x:5.35, y:-3.05, 'font-family':'Bahnschrift', 'font-weight':'700', 'font-size':0.5, fill:GREEN }, sc).textContent = 'ROBOT 01 ONLINE';
+  el('polyline', { points:'5.4,-2.0 6.0,-2.05 6.6,-2.02 7.2,-2.2 7.8,-2.14 8.4,-2.36 9.0,-2.3 9.6,-2.52 10.2,-2.46 10.8,-2.7 11.5,-2.78', fill:'none', stroke:GREEN, 'stroke-width':0.06, 'stroke-linejoin':'round' }, sc);
+  // left wall: logo + clocks (plane x = 0)
+  const lw = el('g', { transform: mX(0.03) });
+  const hx = [], cx = -2.6, cy = -3.1, r = 0.62;
+  for (let k = 0; k < 6; k++){ const a = Math.PI/180 * (60*k - 90); hx.push((cx + r*Math.cos(a)).toFixed(3) + ',' + (cy + r*Math.sin(a)).toFixed(3)); }
+  el('polygon', { points:hx.join(' '), fill:'none', stroke:GOLD, 'stroke-width':0.08 }, lw);
+  el('rect', { x:cx-0.3, y:cy-0.22, width:0.6, height:0.46, rx:0.1, fill:GOLD }, lw);
+  el('rect', { x:cx-0.17, y:cy-0.08, width:0.1, height:0.12, fill:'#0E1014' }, lw);
+  el('rect', { x:cx+0.07, y:cy-0.08, width:0.1, height:0.12, fill:'#0E1014' }, lw);
+  el('text', { x:cx, y:-2.05, 'text-anchor':'middle', 'font-family':'Bahnschrift', 'font-weight':'600', 'font-size':0.3, 'letter-spacing':0.06, fill:GOLD }, lw).textContent = 'TRADING OFFICE';
+  [['LDN','13:30',-5.6],['NY','08:30',-7.0],['CHI','07:30',-8.4]].forEach(([c,t,u]) => {
+    el('rect', { x:u-0.55, y:-3.55, width:1.1, height:0.95, rx:0.08, fill:'#0A0C0F', stroke:'#3A404B', 'stroke-width':0.03 }, lw);
+    el('text', { x:u, y:-3.2, 'text-anchor':'middle', 'font-family':'Bahnschrift', 'font-size':0.22, fill:'#8F96A2' }, lw).textContent = c;
+    el('text', { x:u, y:-2.83, 'text-anchor':'middle', 'font-family':'Bahnschrift', 'font-weight':'700', 'font-size':0.3, fill:GOLD }, lw).textContent = t;
+  });
+
+  // furniture helpers
+  function plant(x,y){
+    box(x,y,0,0.6,0.6,0.45,'#4A505C');
+    box(x-0.12,y+0.08,0.45,0.42,0.42,0.42,'#2E9E66');
+    box(x+0.3,y-0.08,0.5,0.42,0.42,0.5,'#34AE70');
+    box(x+0.1,y+0.28,0.62,0.42,0.42,0.46,'#2A9160');
+    box(x+0.16,y+0.12,0.95,0.3,0.3,0.34,'#3CC17E');
+  }
+  function rack(x,y){
+    box(x,y,0,1.0,0.8,2.3,'#1C2027',{ left:'#20252D', right:'#171A20', top:'#2B3038' });
+    const g = el('g', { transform: mY(y+0.805) });
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 3; c++){
+      const on = (r*3 + c) % 4 === 0, warm = (r + c) % 5 === 0;
+      el('rect', { x:x+0.14+c*0.26, y:-(2.1 - r*0.28), width:0.14, height:0.05, fill: on ? '#3DDC84' : warm ? '#E3A82B' : '#2C3A33' }, g);
+    }
+  }
+  function desk(x,y,accent,live){
+    box(x,y,0,2.8,1.3,0.95,'#3A404B',{ top:'#4B5260', left:'#343A44', right:'#2A2F37' });
+    poly([[x,y+1.3,0.12],[x+2.8,y+1.3,0.12],[x+2.8,y+1.3,0.21],[x,y+1.3,0.21]], accent);
+    poly([[x+0.75,y+0.78,0.952],[x+2.05,y+0.78,0.952],[x+2.05,y+1.02,0.952],[x+0.75,y+1.02,0.952]], '#5B6272');
+    for (let i = 0; i < 2; i++){
+      const mx = x + 0.2 + i*1.3;
+      box(mx+0.48,y+0.26,0.95,0.18,0.08,0.18,'#1F232A');
+      box(mx,y+0.18,1.12,1.15,0.1,0.72,'#15181D',{ left: live ? '#0C1A14' : '#101216', top:'#2A2F37', right:'#1F232A' });
+      if (live){
+        const g = el('g', { transform: mY(y+0.285) });
+        const pts = i === 0 ? '0.1,-1.3 0.3,-1.38 0.5,-1.33 0.7,-1.52 0.9,-1.46 1.05,-1.62' : '0.1,-1.55 0.3,-1.48 0.5,-1.6 0.7,-1.42 0.9,-1.5 1.05,-1.36';
+        el('polyline', { points: pts.split(' ').map(p => { const [u,v] = p.split(',').map(Number); return (mx+u).toFixed(2) + ',' + v; }).join(' '), fill:'none', stroke: i === 0 ? GREEN : GOLD, 'stroke-width':0.05 }, g);
+      }
+    }
+  }
+  function seat(x,y){ box(x+0.35,y+0.35,0,0.1,0.1,0.45,'#1E2228'); box(x,y,0.45,0.8,0.8,0.12,'#2E343D'); }
+  function chairBack(x,y){ box(x,y+0.7,0.57,0.8,0.12,0.42,'#2A2F37',{ left:'#262B33', top:'#363C46', right:'#1F232A' }); }
+  function robot(x,y,z,col,facing,lamp){
+    box(x,y,z,0.8,0.7,0.72,col);
+    box(x+0.04,y+0.03,z+0.76,0.72,0.64,0.6,col,{ top: shade(col,1.18) });
+    box(x+0.1,y+0.26,z+1.36,0.14,0.14,0.2,col); box(x+0.56,y+0.26,z+1.36,0.14,0.14,0.2,col);
+    if (facing){
+      const g = el('g', { transform: mY(y+0.672) });
+      el('rect', { x:x+0.2, y:-(z+1.2), width:0.13, height:0.16, fill:'#101216' }, g);
+      el('rect', { x:x+0.47, y:-(z+1.2), width:0.13, height:0.16, fill:'#101216' }, g);
+    }
+    line([x+0.4,y+0.35,z+1.36],[x+0.4,y+0.35,z+1.72], shade(col,0.6), 1.6);
+    const t = P(x+0.4,y+0.35,z+1.78); el('circle', { cx:t[0], cy:t[1], r:3.2, fill:lamp });
+  }
+  function tag(pt, text, color){
+    const [px,py] = P(...pt), w = text.length * 5.7 + 26;
+    const g = el('g', {});
+    el('rect', { x:px - w/2, y:py - 11, width:w, height:22, rx:11, fill:'rgba(14,16,20,0.94)', stroke:'#3A404B' }, g);
+    el('circle', { cx:px - w/2 + 12, cy:py, r:3.6, fill:color }, g);
+    el('text', { x:px - w/2 + 21, y:py + 3.6, 'font-family':'Bahnschrift', 'font-weight':'600', 'font-size':10.5, 'letter-spacing':0.4, fill:'#FFFFFF' }, g).textContent = text;
+  }
+
+  // scene, back to front
+  rack(0.3,0.3);
+  desk(3.0,1.5,GOLD,true); seat(4.0,3.05); robot(4.0,3.1,0.57,'#E3A82B',false,GREEN); chairBack(4.0,3.05);
+  box(0.8,6.6,0,3.9,0.35,1.05,'#353B48');                       // sofa back
+  box(0.6,6.6,0,0.25,1.45,0.7,'#3B4150');                       // left arm
+  box(0.85,6.95,0,3.85,1.1,0.45,'#3B4150',{ top:'#474E5E' });   // seat
+  robot(2.3,7.15,0.45,'#3FB6C8',true,GOLD);                     // resting robot
+  box(4.7,6.6,0,0.25,1.45,0.7,'#3B4150');                       // right arm
+  desk(7.5,1.5,'#3FB6C8',false); seat(8.5,3.05); chairBack(8.5,3.05);
+  box(1.9,8.25,0,1.7,0.6,0.35,'#2F343E',{ top:'#3A404B' });     // coffee table
+  box(12.0,0.55,0,0.7,0.7,1.2,'#D5DAE2'); box(12.1,0.65,1.2,0.5,0.5,0.55,'#7CC7E6',{ top:'#9AD6EF' });
+  desk(8.4,5.3,'#8A6CF0',false); seat(9.4,6.85); chairBack(9.4,6.85);
+  plant(12.1,8.9);
+
+  // floating name tags
+  tag([4.4,3.45,2.75], 'ROBOT 01 · IN A TRADE', GREEN);
+  tag([2.7,7.5,2.55], 'ROBOT 02 · WAITING', GOLD);
+  tag([8.9,2.1,1.95], 'DESK 02 · FREE', '#7B818D');
+  tag([9.8,5.9,2.45], 'DESK 03 · FREE', '#7B818D');
+})();
+
+</script>
+</body>
+</html>
