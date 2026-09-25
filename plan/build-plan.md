@@ -54,7 +54,7 @@ Each milestone ends with something we can see working.
 
 ### M1 · The buttons, on a test robot (me)
 
-**Status (24 Sep):** built. The robot trades the placeholder strategy instead of timed test trades. Waiting on the Supabase project and FTMO's MetaTrader 5 for the first compile and live test. Setup steps are in the [README](../README.md).
+**Status (25 Sep):** Robot 01 is live on FTMO demo account 1514746116. It reports to Supabase, and Telegram announced its start. A Pause sent through the database was confirmed in 2.3 seconds. The robot trades the placeholder strategy instead of timed test trades. Still to check: Start from the control page with a real login, Close everything on an open position, and the offline alert. Setup steps are in the [README](../README.md).
 
 This is the skeleton everything else hangs on, built before the strategy exists.
 
