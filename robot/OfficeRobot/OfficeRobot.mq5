@@ -9,7 +9,7 @@
 //|    Start in the office.                                          |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "0.10"
+#property version     "1.00"
 #property description "Trading Office robot: placeholder EMA-cross strategy, FTMO 2-Step guards, controlled from the office."
 
 #include "Clock.mqh"
@@ -19,7 +19,7 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "0.1.0"
+#define ROBOT_VERSION "1.0.0"
 
 enum ENUM_ROBOT_STATE
   {
@@ -30,7 +30,7 @@ enum ENUM_ROBOT_STATE
 
 input group "Office link"
 input string          InpOfficeUrl          = "";          // Supabase project URL (https://xxxx.supabase.co)
-input string          InpOfficeKey          = "";          // Supabase anon public key
+input string          InpOfficeKey          = "";          // Supabase publishable key (sb_publishable_...)
 input string          InpRobotToken         = "";          // This robot's token (from create_robot)
 input int             InpPollSeconds        = 3;           // Check for commands every N seconds
 input int             InpReportSeconds      = 30;          // Send a full report every N seconds

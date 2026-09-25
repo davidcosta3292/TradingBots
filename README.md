@@ -20,7 +20,7 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run `supabase/migrations/0001_office.sql`, then `0002_alerts.sql`.
+2. **SQL Editor:** run the files in `supabase/migrations/` in order: `0001`, `0002`, then `0003`.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in, and create one robot each:
@@ -31,22 +31,22 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
    select public.create_robot('Robot 02', 'friend@example.com');  -- give this one to your friend
    ```
    Each token is shown only once. If one gets lost, run `select public.reset_robot_token('Robot 01');`
-6. **Project Settings → API:** note the *Project URL* and the *anon public* key.
+6. **Project Settings → API Keys:** note the *Project URL* and the *publishable* key (`sb_publishable_…`).
 
 ### 2. Phone alerts (optional, 5 minutes)
 
-1. In Telegram, message **@BotFather**, send `/newbot`, and copy the bot token.
-2. Add the bot to a group with both of us, and send a message there.
-3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy the `chat` → `id` number.
-4. **SQL Editor:**
-   ```sql
-   select public.set_telegram('<bot token>', '<chat id>');
-   select public.telegram('Trading Office connected');
+1. In Telegram, search for **@BotFather**, send `/newbot`, and pick a name, then a username ending in `bot`. BotFather replies with a token.
+2. Tap the link to your new bot and press **Start**. For alerts in a group with both of us, add the bot to the group and send a message there instead.
+3. In PowerShell, in the repo folder, run:
    ```
+   powershell -ExecutionPolicy Bypass -File .\tools\telegram-setup.ps1
+   ```
+   Paste the token when asked. The script finds your chat, sends a test message, and copies one line to your clipboard.
+4. Paste that line into the Supabase **SQL Editor** and press **Run**. You should get "Trading Office connected" in Telegram.
 
 ### 3. Control page
 
-1. Copy `office/config.example.js` to `office/config.js`, and fill in the Project URL and anon key.
+1. Copy `office/config.example.js` to `office/config.js`, and fill in the Project URL and publishable key.
 2. From the repo folder, run `python -m http.server 5173 --directory office`.
 3. Open http://localhost:5173 and sign in. To see it before anything is set up, open http://localhost:5173/?demo.
 
@@ -58,7 +58,7 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
    - tick *Allow WebRequest for listed URL*, and add the Supabase Project URL.
 3. **Install the robot:** in PowerShell, in the repo folder, run `.\robot\install.ps1`. It copies and compiles the robot.
 4. **Attach it:** open an **XAUUSD** chart and drag **OfficeRobot** onto it from *Navigator → Expert Advisors*. Then, under **Inputs**:
-   - `Supabase project URL`, `anon public key`, and your own robot's token;
+   - `Supabase project URL`, `Supabase publishable key`, and your own robot's token;
    - `Magic number`: **101** for Robot 01, **102** for Robot 02.
 5. Switch on **Algo Trading** in the MetaTrader toolbar. The chart shows `PAUSED | office link: ok`, and the robot appears in the office. Press **Start** there.
 

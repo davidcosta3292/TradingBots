@@ -130,9 +130,11 @@ public:
       int length=StringToCharArray(body,data,0,WHOLE_ARRAY,CP_UTF8);
       if(length>0)
          ArrayResize(data,length-1);   // drop the trailing zero
-      string headers="Content-Type: application/json\r\n"
-                     +"apikey: "+m_key+"\r\n"
-                     +"Authorization: Bearer "+m_key+"\r\n";
+      // New publishable keys (sb_publishable_...) go in apikey only;
+      // legacy anon keys are JWTs and also go in Authorization.
+      string headers="Content-Type: application/json\r\napikey: "+m_key+"\r\n";
+      if(StringFind(m_key,"eyJ")==0)
+         headers+="Authorization: Bearer "+m_key+"\r\n";
 
       ResetLastError();
       int status=WebRequest("POST",m_url+"/rest/v1/rpc/robot_sync",headers,timeoutMs,data,result,resultHeaders);
