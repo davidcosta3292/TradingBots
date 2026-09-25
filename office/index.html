@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E1014">
+  <title>Trading Office</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z' fill='%230E1014' stroke='%23E3A82B' stroke-width='2'/%3E%3Crect x='8' y='9' width='8' height='6.4' rx='1.6' fill='%23E3A82B'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z" fill="none" stroke="#E3A82B" stroke-width="2"/><rect x="8" y="9" width="8" height="6.4" rx="1.6" fill="#E3A82B"/></svg>
+      Trading Office
+    </div>
+    <div id="who" class="who"></div>
+  </header>
+
+  <main>
+    <section id="login" class="login" hidden>
+      <h1>Sign in</h1>
+      <p>Use the login created for you in Supabase.</p>
+      <form id="login-form">
+        <label>Email <input name="email" type="email" autocomplete="username" required></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Sign in</button>
+      </form>
+    </section>
+
+    <section id="office" hidden>
+      <div id="summary" class="summary"></div>
+      <div id="robots" class="grid"></div>
+    </section>
+
+    <section id="message" class="message" hidden></section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+</body>
+</html>

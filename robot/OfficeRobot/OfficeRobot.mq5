@@ -349,12 +349,12 @@ bool Execute(const string type,string &result)
      {
       if(g_maxStopTripped)
         {
-         result="refused: the max-loss stop was reached";
+         result="the max-loss stop was reached";
          return false;
         }
       if(g_guards.DailyStopTripped())
         {
-         result="refused: the daily loss stop was reached, back at 00:00 Prague";
+         result="the daily loss stop was reached, back at 00:00 Prague";
          return false;
         }
       g_state=STATE_ACTIVE;
@@ -405,7 +405,7 @@ void HandleCommands(const string list)
       bool ok=Execute(type,result);
       RememberDone(id);
       g_link.QueueAck(id,ok ? "done" : "refused",result);
-      Event("command",CommandLabel(type)+": "+result);
+      Event("command",CommandLabel(type)+(ok ? ": " : " refused: ")+result);
      }
    g_reportNow=true;
   }
