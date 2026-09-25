@@ -6,6 +6,9 @@ v1 · 24 Sep 2026. How we get from [the plan PDF](Trading-Office-Plan.pdf) to a 
 
 - **The office controls the robots (option B):** Start, Pause, Done for today, Close everything. Nobody places trades from the office.
 - **Where it runs:** our own PC during demo. The robot moves to a VPS for the last 1–2 weeks of demo, then goes live on the VPS.
+- **FTMO, 2-Step rules, demo only for now** (24 Sep): FTMO Free Trials on MetaTrader 5, to see whether the robot fits the challenge's rules.
+- **Two accounts, two robots, one office** (24 Sep): one FTMO account each. Only a robot's owner can press its buttons; the other watches.
+- **Placeholder strategy** (24 Sep): a common EMA crossover until the strategy card is filled in.
 
 ## Still open
 
@@ -50,6 +53,8 @@ Each milestone ends with something we can see working.
 **Done when:** the platform is picked, the card is filled in, and the demo account and both services exist.
 
 ### M1 · The buttons, on a test robot (me)
+
+**Status (24 Sep):** built. The robot trades the placeholder strategy instead of timed test trades. Waiting on the Supabase project and FTMO's MetaTrader 5 for the first compile and live test. Setup steps are in the [README](../README.md).
 
 This is the skeleton everything else hangs on, built before the strategy exists.
 
