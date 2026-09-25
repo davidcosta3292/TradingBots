@@ -1,10 +1,12 @@
 // Trading Office control page.
-// Shows every robot live. Each robot's owner can press Start, Pause,
-// Done for today and Close everything; the robot confirms each press.
-// Add ?demo to the address to preview with sample robots, no Supabase needed.
+// Two views of the same live data: the 3D office, and plain cards. Each
+// robot's owner can press Start, Pause, Done for today and Close everything;
+// the robot confirms each press. Add ?demo to the address to preview with
+// sample robots, no Supabase needed.
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const OFFLINE_AFTER_MS = 75_000;
+const VIEW_KEY = 'trading-office-view';
 
 const BUTTONS = [
   { type: 'start', label: 'Start', hint: 'May take new trades', icon: '▶' },
@@ -23,6 +25,10 @@ const store = {
   events: new Map(),      // robot id -> newest events first
 };
 let sb = null;
+let view = 'cards';
+let selectedId = null;
+let office = null;        // the 3D scene, loaded on first use
+let officeLoading = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
@@ -33,19 +39,19 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
 // ---------------------------------------------------------------------------
 
 async function main() {
-  $('robots').addEventListener('click', onButton);
+  document.addEventListener('click', onClick);
 
   if (DEMO) {
     loadDemo();
     $('who').textContent = 'Demo mode · sample robots';
-    return startOffice();
+    return startWorkspace();
   }
 
   const cfg = window.OFFICE_CONFIG;
   if (!cfg?.url || !cfg?.anonKey || cfg.url.includes('YOUR-PROJECT')) {
     return showMessage(`<h1>Almost there</h1>
       <p>Copy <code>office/config.example.js</code> to <code>office/config.js</code> and fill in your
-      Supabase project URL and anon key.</p>
+      Supabase project URL and publishable key.</p>
       <p>Want a look first? Open <a href="?demo">the demo</a>.</p>`);
   }
 
@@ -66,21 +72,22 @@ async function main() {
   }
   if (!store.members.has(store.me.id)) {
     return showMessage(`<h1>Not in the office yet</h1>
-      <p>Signed in as ${esc(store.me.email)}, but this login isn't an office member.
-      Add it in the Supabase SQL editor with <code>select add_member('email', 'Name');</code></p>
-      <p><button class="link" id="signout">Sign out</button></p>`, () => $('signout').onclick = () => sb.auth.signOut());
+      <p>Signed in as ${esc(store.me.email)}, but this login isn't an office member yet.</p>
+      <p><button class="link" data-signout>Sign out</button></p>`);
   }
 
-  $('who').innerHTML = `${esc(store.members.get(store.me.id))} · <button class="link" id="signout">Sign out</button>`;
-  $('signout').onclick = () => sb.auth.signOut();
+  $('who').innerHTML = `${esc(store.members.get(store.me.id))} · <button class="link" data-signout>Sign out</button>`;
   subscribe();
-  startOffice();
+  startWorkspace();
 }
 
-function startOffice() {
-  $('office').hidden = false;
-  render();
-  setInterval(render, 5000); // keeps "last seen" and offline badges current
+function startWorkspace() {
+  $('workspace').hidden = false;
+  $('views').hidden = false;
+  let saved = null;
+  try { saved = localStorage.getItem(VIEW_KEY); } catch { /* private window */ }
+  setView(saved || (window.innerWidth >= 760 ? 'office' : 'cards'));
+  setInterval(render, 5000); // keeps "last seen", offline badges and clocks current
 }
 
 function showLogin() {
@@ -94,10 +101,48 @@ function showLogin() {
   });
 }
 
-function showMessage(html, after) {
+function showMessage(html) {
   $('message').innerHTML = html;
   $('message').hidden = false;
-  if (after) after();
+}
+
+// ---------------------------------------------------------------------------
+// Views
+// ---------------------------------------------------------------------------
+
+function setView(next) {
+  view = next === 'office' ? 'office' : 'cards';
+  document.body.dataset.view = view;
+  try { localStorage.setItem(VIEW_KEY, view); } catch { /* private window */ }
+  document.querySelectorAll('#views button').forEach((b) => b.classList.toggle('on', b.dataset.view === view));
+  if (view === 'office') {
+    loadOffice().then((scene) => {
+      if (!scene) return;
+      scene.setActive(view === 'office');
+      render();
+    });
+  } else {
+    office?.setActive(false);
+  }
+  render();
+}
+
+function loadOffice() {
+  officeLoading ??= import('./scene.js?v=4')
+    .then(({ createOfficeScene }) => {
+      office = createOfficeScene($('scene'), {
+        onSelect: (id) => {
+          selectedId = id;
+          render();
+        },
+      });
+      return office;
+    })
+    .catch((error) => {
+      $('scene').innerHTML = `<p class="scene-error">The 3D office could not load (${esc(error.message)}). The Cards view still works.</p>`;
+      return null;
+    });
+  return officeLoading;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,10 +192,20 @@ function subscribe() {
 }
 
 // ---------------------------------------------------------------------------
-// Buttons
+// Clicks: view switch, panel, sign out, and the four buttons
 // ---------------------------------------------------------------------------
 
-async function onButton(event) {
+async function onClick(event) {
+  const viewButton = event.target.closest('#views button[data-view]');
+  if (viewButton) return setView(viewButton.dataset.view);
+
+  if (event.target.closest('[data-signout]')) return sb?.auth.signOut();
+
+  if (event.target.closest('[data-close-panel]')) {
+    selectedId = null;
+    return render();
+  }
+
   const button = event.target.closest('button[data-cmd]');
   if (!button || button.disabled) return;
   const robot = store.robots.get(button.dataset.robot);
@@ -174,12 +229,27 @@ async function onButton(event) {
 // Rendering
 // ---------------------------------------------------------------------------
 
+function sortedRobots() {
+  return [...store.robots.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function render() {
-  const robots = [...store.robots.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const robots = sortedRobots();
   $('summary').innerHTML = summary(robots);
-  $('robots').innerHTML = robots.length
-    ? robots.map(card).join('')
-    : '<p class="empty">No robots yet. Create one with <code>create_robot()</code> in the Supabase SQL editor.</p>';
+
+  if (view === 'cards') {
+    $('robots').innerHTML = robots.length
+      ? robots.map(card).join('')
+      : '<p class="empty">No robots yet. Create one with <code>create_robot()</code> in the Supabase SQL editor.</p>';
+    return;
+  }
+
+  office?.update({ robots, selected: selectedId });
+  const robot = selectedId && store.robots.get(selectedId);
+  $('panel').hidden = !robot;
+  if (robot) {
+    $('panel').innerHTML = `<button class="panel-close" data-close-panel aria-label="Close">✕</button>${card(robot)}`;
+  }
 }
 
 function summary(robots) {
@@ -352,31 +422,34 @@ function loadDemo() {
   store.me = { id: 'me' };
   store.members.set('me', 'David').set('friend', 'Friend');
   const base = {
-    currency: 'USD', timeframe: 'M15', strategy: 'EMA 20/50 cross, ATR(14) stop', initial: 10000,
-    ftmo_daily_floor: 9500, robot_daily_stop: 9600, ftmo_max_floor: 9000, robot_max_stop: 9200,
+    currency: 'USD', timeframe: 'M15', strategy: 'EMA 20/50 cross, ATR(14) stop', initial: 25000,
+    ftmo_daily_floor: 23750, robot_daily_stop: 24000, ftmo_max_floor: 22500, robot_max_stop: 23000,
   };
   store.robots.set('r1', {
-    id: 'r1', name: 'Robot 01', owner_id: 'me', state: 'active', symbol: 'XAUUSD', account_login: 1520448811,
+    id: 'r1', name: 'Robot 01', owner_id: 'me', state: 'active', symbol: 'XAUUSD', account_login: 1514746116,
     last_report_at: iso(4000),
-    status: { ...base, equity: 10086.4, day_pnl: 61.2, trades_today: 1, daily_used_pct: 0, max_used_pct: 0,
-      positions: [{ side: 'buy', volume: 0.05, open: 2651.2, sl: 2640.1, tp: 2673.4, profit: 25.2 }], blocks: [] },
+    status: { ...base, equity: 25086.4, day_pnl: 61.2, trades_today: 1, daily_used_pct: 0, max_used_pct: 0,
+      positions: [{ side: 'buy', volume: 0.05, open: 3751.2, sl: 3740.1, tp: 3773.4, profit: 25.2 }], blocks: [],
+      last_action: '15:15 Opened BUY 0.05 lots XAUUSD' },
   });
   store.robots.set('r2', {
-    id: 'r2', name: 'Robot 02', owner_id: 'friend', state: 'paused', symbol: 'XAUUSD', account_login: 1520448990,
+    id: 'r2', name: 'Robot 02', owner_id: 'friend', state: 'paused', symbol: 'XAUUSD', account_login: 1514746990,
     last_report_at: iso(9000),
-    status: { ...base, equity: 9912.7, day_pnl: -87.3, trades_today: 2, daily_used_pct: 17.5, max_used_pct: 8.7,
-      positions: [], blocks: ['news: USD Non-Farm Employment Change at 14:30 Prague'] },
+    status: { ...base, equity: 24912.7, day_pnl: -87.3, trades_today: 2, daily_used_pct: 7, max_used_pct: 3.5,
+      positions: [], blocks: ['news: USD Non-Farm Employment Change at 14:30 Prague'], last_action: '14:02 Pause: paused' },
   });
   store.lastCommand.set('r2', { id: 7, robot_id: 'r2', type: 'pause', created_by: 'friend', created_at: iso(600000), status: 'done', result: 'paused' });
   store.events.set('r1', [
-    { at: iso(420000), message: 'Opened BUY 0.05 lots XAUUSD, stop 2640.10, target 2673.40' },
+    { at: iso(420000), message: 'Opened BUY 0.05 lots XAUUSD, stop 3740.10, target 3773.40' },
     { at: iso(3600000), message: 'Start: working' },
-    { at: iso(3700000), message: 'Started 0.1.0 on XAUUSD M15, account 1520448811 (demo). Paused until you press Start.' },
+    { at: iso(3700000), message: 'Started 1.0.1 on XAUUSD M15, account 1514746116 (demo). Paused until you press Start.' },
   ]);
   store.events.set('r2', [
     { at: iso(600000), message: 'Pause: paused' },
     { at: iso(2400000), message: 'Closed by stop loss: -87.30' },
   ]);
+  // Demo only: lets you (or a test) change the sample robots from the console.
+  window.officeDemo = { store, render: () => render() };
 }
 
 function demoCommand(robot, type) {

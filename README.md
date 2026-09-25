@@ -47,8 +47,10 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 3. Control page
 
 1. Copy `office/config.example.js` to `office/config.js`, and fill in the Project URL and publishable key.
-2. From the repo folder, run `python -m http.server 5173 --directory office`.
-3. Open http://localhost:5173 and sign in. To see it before anything is set up, open http://localhost:5173/?demo.
+2. Double-click **`Open Trading Office.cmd`** in the repo folder. It starts a small local server (`office/serve.py`), and opens http://localhost:8765 in your browser. Keep the minimized server window open while you use the page.
+3. Sign in. To see it before anything is set up, open http://localhost:8765/?demo.
+
+The page has two views: **Office**, the 3D office, and **Cards**, the plain list that works best on a phone.
 
 ### 4. The robot (each of us, on our own PC and FTMO account)
 

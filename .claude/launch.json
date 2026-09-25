@@ -4,8 +4,8 @@
     {
       "name": "office",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5173", "--directory", "office"],
-      "port": 5173
+      "runtimeArgs": ["office/serve.py", "8765"],
+      "port": 8765
     }
   ]
 }

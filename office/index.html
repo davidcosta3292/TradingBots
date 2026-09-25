@@ -6,9 +6,17 @@
   <meta name="theme-color" content="#0E1014">
   <title>Trading Office</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z' fill='%230E1014' stroke='%23E3A82B' stroke-width='2'/%3E%3Crect x='8' y='9' width='8' height='6.4' rx='1.6' fill='%23E3A82B'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=3">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
   <script src="config.js"></script>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=4"></script>
 </head>
 <body>
   <header class="topbar">
@@ -16,6 +24,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z" fill="none" stroke="#E3A82B" stroke-width="2"/><rect x="8" y="9" width="8" height="6.4" rx="1.6" fill="#E3A82B"/></svg>
       Trading Office
     </div>
+    <nav id="views" class="views" hidden>
+      <button type="button" data-view="office">Office</button>
+      <button type="button" data-view="cards">Cards</button>
+    </nav>
     <div id="who" class="who"></div>
   </header>
 
@@ -30,8 +42,13 @@
       </form>
     </section>
 
-    <section id="office" hidden>
+    <section id="workspace" hidden>
       <div id="summary" class="summary"></div>
+      <div id="scene-view" class="scene-view">
+        <div id="scene" class="scene"></div>
+        <p class="scene-hint">Drag to turn · scroll to zoom · click a robot</p>
+        <aside id="panel" class="panel" hidden></aside>
+      </div>
       <div id="robots" class="grid"></div>
     </section>
 

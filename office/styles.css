@@ -279,8 +279,120 @@ main { max-width: 1120px; margin: 0 auto; padding: 16px; }
   font-size: 14px;
 }
 
+/* View switch */
+.views {
+  display: flex;
+  gap: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px;
+}
+.views button {
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  font: 600 13px var(--body);
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.views button.on { background: var(--gold); color: #2b1e00; }
+
+body[data-view="office"] main { max-width: none; padding: 12px 16px 16px; }
+body[data-view="office"] #robots { display: none; }
+body[data-view="cards"] #scene-view { display: none; }
+
+/* The 3D office */
+.scene-view {
+  position: relative;
+  height: calc(100dvh - 120px);
+  min-height: 460px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0b0d11;
+}
+.scene { position: absolute; inset: 0; z-index: 0; isolation: isolate; }
+.scene canvas { display: block; }
+.scene-labels { position: absolute; inset: 0; pointer-events: none; }
+.scene-hint {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  pointer-events: none;
+}
+.scene-error { padding: 24px; color: var(--muted); }
+
+/* Name tags above robots and free desks */
+.tag {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(14, 16, 20, 0.92);
+  border: 1px solid #3a404b;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-family: var(--head);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  white-space: nowrap;
+  user-select: none;
+}
+.tag b { font-weight: 600; }
+.tag .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.tag .st { color: var(--muted); }
+.tag .pnl { font-weight: 600; }
+.tag.selected { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(227, 168, 43, 0.25); }
+.tag.free {
+  cursor: default;
+  background: transparent;
+  border-style: dashed;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+/* Side panel with the selected robot's card */
+.panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(380px, calc(100% - 24px));
+  overflow-y: auto;
+  z-index: 3;
+}
+.panel .robot { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); }
+.panel .robot-head { padding-right: 34px; }
+.panel-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  z-index: 1;
+  margin: 8px 8px -38px 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .scene-view { height: calc(100dvh - 150px); }
+  .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 62%; }
+}
+
 @media (max-width: 520px) {
   main { padding: 12px; }
   .grid { grid-template-columns: 1fr; }
   .summary .clock { margin-left: 0; }
+  .topbar { flex-wrap: wrap; }
 }
