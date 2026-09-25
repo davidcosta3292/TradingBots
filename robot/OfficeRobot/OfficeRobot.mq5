@@ -29,8 +29,8 @@ enum ENUM_ROBOT_STATE
   };
 
 input group "Office link"
-input string          InpOfficeUrl          = "";          // Supabase project URL (https://xxxx.supabase.co)
-input string          InpOfficeKey          = "";          // Supabase publishable key (sb_publishable_...)
+input string          InpOfficeUrl          = "https://tpmrowyqsayyypkxkvfz.supabase.co";         // Supabase project URL
+input string          InpOfficeKey          = "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM";  // Supabase publishable key (public)
 input string          InpRobotToken         = "";          // This robot's token (from create_robot)
 input int             InpPollSeconds        = 3;           // Check for commands every N seconds
 input int             InpReportSeconds      = 30;          // Send a full report every N seconds
