@@ -19,7 +19,10 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.0.0"
+#define ROBOT_VERSION "1.0.1"
+// Our office. Used whenever the URL or key input is left empty.
+#define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
+#define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
 
 enum ENUM_ROBOT_STATE
   {
@@ -29,8 +32,8 @@ enum ENUM_ROBOT_STATE
   };
 
 input group "Office link"
-input string          InpOfficeUrl          = "https://tpmrowyqsayyypkxkvfz.supabase.co";         // Supabase project URL
-input string          InpOfficeKey          = "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM";  // Supabase publishable key (public)
+input string          InpOfficeUrl          = OFFICE_URL;  // Supabase project URL (empty = our office)
+input string          InpOfficeKey          = OFFICE_KEY;  // Supabase publishable key (empty = our office)
 input string          InpRobotToken         = "";          // This robot's token (from create_robot)
 input int             InpPollSeconds        = 3;           // Check for commands every N seconds
 input int             InpReportSeconds      = 30;          // Send a full report every N seconds
@@ -113,6 +116,24 @@ string CommandLabel(const string type)
    if(type=="close_all")
       return "Close everything";
    return type;
+  }
+
+// Inputs pasted with stray spaces or quotes still work.
+string Cleaned(string value)
+  {
+   StringTrimLeft(value);
+   StringTrimRight(value);
+   while(StringLen(value)>0 && (StringGetCharacter(value,0)=='"' || StringGetCharacter(value,0)=='\''))
+      value=StringSubstr(value,1);
+   while(StringLen(value)>0 && (StringGetCharacter(value,StringLen(value)-1)=='"' || StringGetCharacter(value,StringLen(value)-1)=='\''))
+      value=StringSubstr(value,0,StringLen(value)-1);
+   return value;
+  }
+
+string OrDefault(const string value,const string fallback)
+  {
+   string cleaned=Cleaned(value);
+   return cleaned=="" ? fallback : cleaned;
   }
 
 string TimeframeName(const ENUM_TIMEFRAMES timeframe)
@@ -523,9 +544,7 @@ void OnNewBar(void)
 //+------------------------------------------------------------------+
 void ShowOnChart(void)
   {
-   string link="office link: not configured";
-   if(g_link.Enabled())
-      link=g_link.LastError()=="" ? "office link: ok" : "office link: "+g_link.LastError();
+   string link=g_link.LastError()=="" ? "office link: ok" : "office link: "+g_link.LastError();
    string blocks="none";
    for(int i=0;i<ArraySize(g_blocks);i++)
       blocks=(i==0 ? "" : blocks+"; ")+g_blocks[i];
@@ -568,7 +587,7 @@ int OnInit(void)
       return INIT_FAILED;
      }
    g_trader.Init(_Symbol,InpMagic,InpMaxSlippagePoints);
-   g_link.Init(InpOfficeUrl,InpOfficeKey,InpRobotToken);
+   g_link.Init(OrDefault(InpOfficeUrl,OFFICE_URL),OrDefault(InpOfficeKey,OFFICE_KEY),Cleaned(InpRobotToken));
 
    g_state=STATE_PAUSED;
    if(MQLInfoInteger(MQL_TESTER))
@@ -584,7 +603,7 @@ int OnInit(void)
                                 ROBOT_VERSION,_Symbol,TimeframeName(InpTimeframe),
                                 IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)),TradeModeName()));
    if(!g_link.Enabled() && !MQLInfoInteger(MQL_TESTER))
-      Print("[Office] The office link is not configured, so this robot can't receive Start and stays paused.");
+      Print("[Office] Office link off (",g_link.LastError(),"), so this robot can't receive Start and stays paused.");
 
    RefreshBlocks();
    ShowOnChart();

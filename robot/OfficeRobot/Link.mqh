@@ -75,7 +75,15 @@ public:
       m_sentAcks=0;
       m_sentDeals=0;
       m_sentEvents=0;
-      m_lastError=m_enabled ? "" : "office link not configured";
+      m_lastError="";
+      if(MQLInfoInteger(MQL_TESTER))
+         m_lastError="off in the Strategy Tester";
+      else
+         if(m_token=="")
+            m_lastError="no robot token. Paste it under the robot's Inputs (right-click the chart > Expert list > Properties)";
+         else
+            if(m_url=="" || m_key=="")
+               m_lastError="no office URL or key";
      }
 
    bool              Enabled(void)     { return m_enabled; }
