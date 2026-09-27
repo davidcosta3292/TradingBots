@@ -53,9 +53,20 @@ Within a minute or two it also tells you when a robot goes offline or comes back
 
 ### 3. Control page
 
-1. Copy `office/config.example.js` to `office/config.js`, and fill in the Project URL and publishable key.
+1. The office is already configured for this Supabase project in `office/config.js`. For a different project, replace its URL and publishable key. The publishable key is safe to serve to browsers; never put a service-role key, robot token, or Telegram token here.
 2. Double-click **`Open Trading Office.cmd`** in the repo folder. It starts a small local server (`office/serve.py`), and opens http://localhost:8765 in your browser. Keep the minimized server window open while you use the page.
 3. Sign in. To see it before anything is set up, open http://localhost:8765/?demo.
+
+#### Share the office on Vercel
+
+The office is a static website. Vercel serves only the `office/` folder; Supabase still handles sign-in, commands, and robot reports. MetaTrader and the EA continue running on the Windows PC. Publishing the website does not move or start the trading robot.
+
+1. Import this private GitHub repository into Vercel and set **Root Directory** to `office`.
+2. Set **Framework Preset** to **Other**. There is no build command or environment variable to add; `office/config.js` contains only the public Supabase project URL and publishable key.
+3. Deploy, then share the resulting `https://…vercel.app` URL. The friend can open it on a Mac without cloning GitHub or installing MetaTrader. The demo view is at `https://…vercel.app/?demo`.
+4. For live data, the friend needs their own Supabase Auth login and an `office_members` row. A website link alone does not grant database access. Only the owner of a robot can press its control buttons.
+
+If an emailed Supabase invitation opens a 404 page, set Supabase Auth's **Site URL** and **Redirect URLs** to the deployed HTTPS origin, then send a new invitation. An old invitation can retain its old redirect destination.
 
 The page has two views: **Office**, the 3D office, and **Cards**, the plain list that works best on a phone.
 

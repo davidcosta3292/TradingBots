@@ -7,6 +7,3 @@ node_modules/
 *.ex5
 compile.log
 
-# Local office settings (Supabase URL and anon key)
-office/config.js
-
