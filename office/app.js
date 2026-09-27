@@ -47,6 +47,7 @@ let view = 'cards';
 let selectedId = null;
 let office = null;        // the 3D scene, loaded on first use
 let officeLoading = null;
+let newRobotToken = null;  // shown only in this browser until the page closes
 const openLooks = new Set(); // robots whose look picker is open
 
 const $ = (id) => document.getElementById(id);
@@ -59,6 +60,7 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
 
 async function main() {
   document.addEventListener('click', onClick);
+  $('setup').addEventListener('submit', createMyRobot);
   $('legend').innerHTML = `<h3>Who is where</h3><ul>${LEGEND.map(([key, place, meaning]) =>
     `<li><i style="background:${MOODS[key].color}"></i><span><b>${place}</b> ${esc(meaning)}</span></li>`).join('')}</ul>`;
 
@@ -356,6 +358,15 @@ function bubbleFor(event) {
 
 async function onClick(event) {
   const target = event.target;
+  if (target.closest('[data-copy-robot-token]')) {
+    if (!newRobotToken) return;
+    try {
+      await navigator.clipboard.writeText(newRobotToken.token);
+      return toast('Robot token copied. Paste it into your own MetaTrader robot settings.');
+    } catch {
+      return toast('Select the token and copy it manually.');
+    }
+  }
   const viewButton = target.closest('#views button[data-view]');
   if (viewButton) return setView(viewButton.dataset.view);
 
@@ -415,6 +426,25 @@ async function onClick(event) {
   render();
 }
 
+async function createMyRobot(event) {
+  event.preventDefault();
+  if (DEMO || !sb || !store.me || newRobotToken) return;
+  if ([...store.robots.values()].some((r) => r.owner_id === store.me.id)) return;
+  const form = event.target;
+  const name = String(new FormData(form).get('name') || '').trim();
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  const { data, error } = await sb.rpc('create_my_robot', { p_name: name });
+  if (error) {
+    button.disabled = false;
+    return toast(`Could not create your robot: ${error.message}`);
+  }
+  newRobotToken = data;
+  const { data: robot } = await sb.from('robots').select('*').eq('id', data.id).single();
+  if (robot) store.robots.set(robot.id, robot);
+  render();
+}
+
 async function changeLook(robotId, field, value) {
   const robot = store.robots.get(robotId);
   if (!robot) return;
@@ -437,12 +467,13 @@ function sortedRobots() {
 
 function render() {
   const robots = sortedRobots();
+  renderSetup(robots);
   $('summary').innerHTML = summary(robots);
 
   if (view === 'cards') {
     $('robots').innerHTML = robots.length
       ? robots.map(card).join('')
-      : '<p class="empty">No robots yet. Create one with <code>create_robot()</code> in the Supabase SQL editor.</p>';
+      : '<p class="empty">No robots yet.</p>';
     return;
   }
 
@@ -452,6 +483,35 @@ function render() {
     $('panel').innerHTML = `<button class="panel-close" data-close-panel aria-label="Close">✕</button>${card(robot)}`;
   }
   office?.update({ robots, selected: selectedId, history: historyOf, latest: latestEvent() });
+}
+
+function renderSetup(robots) {
+  const setup = $('setup');
+  if (DEMO) return;
+  if (newRobotToken) {
+    if (setup.dataset.mode === 'token') return;
+    setup.dataset.mode = 'token';
+    setup.hidden = false;
+    setup.innerHTML = `<h2>${esc(newRobotToken.name)} is ready to connect</h2>
+      <p>This token is shown only now. Copy it and paste it into the <b>Robot token</b> input of OfficeRobot on your own MetaTrader 5 account.</p>
+      <div class="token-line"><code>${esc(newRobotToken.token)}</code><button type="button" data-copy-robot-token>Copy token</button></div>
+      <p><a href="downloads/OfficeRobot-source.zip" download>Download OfficeRobot source</a>. On Mac: in MetaTrader, open <b>File → Open Data Folder</b>, then copy the unzipped <code>OfficeRobot</code> folder into <code>MQL5/Experts</code>. Open <code>OfficeRobot.mq5</code> in MetaEditor and compile it with F7.</p>
+      <p>Attach it to your own FTMO demo chart. Set its magic number to <b>102</b>, allow WebRequest to <code>https://tpmrowyqsayyypkxkvfz.supabase.co</code>, paste your token, and enable Algo Trading. It starts paused; press Start here after it reports in.</p>`;
+    return;
+  }
+  if (robots.some((r) => r.owner_id === store.me?.id)) {
+    setup.dataset.mode = 'owned';
+    setup.hidden = true;
+    return;
+  }
+  if (setup.dataset.mode === 'new') return;
+  setup.dataset.mode = 'new';
+  setup.hidden = false;
+  setup.innerHTML = `<h2>Add your robot</h2>
+    <p>This will create one robot owned by your login. Only you can press its trading controls. You will receive its MetaTrader connection token once.</p>
+    <form><label>Robot name <input name="name" maxlength="40" value="Robot 02" required></label>
+      <button type="submit">Create my robot</button></form>
+    <p><a href="downloads/OfficeRobot-source.zip" download>Download the robot source for MetaTrader 5</a> on your computer. No GitHub login is needed.</p>`;
 }
 
 function summary(robots) {

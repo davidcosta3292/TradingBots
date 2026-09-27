@@ -20,15 +20,15 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0005`.
+2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0006`.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
-5. **SQL Editor:** let both logins in, and create one robot each:
+5. **SQL Editor:** let both logins in. An office member can create their own robot from the hosted page; administrators can also use the helpers below:
    ```sql
    select public.add_member('you@example.com', 'David');
    select public.add_member('friend@example.com', 'Friend');
    select public.create_robot('Robot 01', 'you@example.com');     -- your robot's token
-   select public.create_robot('Robot 02', 'friend@example.com');  -- give this one to your friend
+   -- Your friend can press "Create my robot" on the office site instead.
    ```
    Each token is shown only once. If one gets lost, run `select public.reset_robot_token('Robot 01');`
 6. **Project Settings → API Keys:** note the *Project URL* and the *publishable* key (`sb_publishable_…`).
@@ -61,10 +61,10 @@ Within a minute or two it also tells you when a robot goes offline or comes back
 
 The office is a static website. Vercel serves only the `office/` folder; Supabase still handles sign-in, commands, and robot reports. MetaTrader and the EA continue running on the Windows PC. Publishing the website does not move or start the trading robot.
 
-1. Import this private GitHub repository into Vercel and set **Root Directory** to `office`.
+1. Import this GitHub repository into Vercel and set **Root Directory** to `office`.
 2. Set **Framework Preset** to **Other**. There is no build command or environment variable to add; `office/config.js` contains only the public Supabase project URL and publishable key.
-3. Deploy, then share the resulting `https://…vercel.app` URL. The friend can open it on a Mac without cloning GitHub or installing MetaTrader. The demo view is at `https://…vercel.app/?demo`.
-4. For live data, the friend needs their own Supabase Auth login and an `office_members` row. A website link alone does not grant database access. Only the owner of a robot can press its control buttons.
+3. The deployed page is **https://trading-office-puce.vercel.app/**. The friend can open it on a Mac without cloning GitHub or installing MetaTrader just to view the office. The demo is at https://trading-office-puce.vercel.app/?demo.
+4. For live data, the friend signs in with their own Supabase Auth login. An administrator adds their existing Auth user to `office_members`; a website link alone does not grant database access. Once signed in, a member without a robot sees **Add your robot**. Press **Create my robot**, copy the token shown once, and use that token in their own MetaTrader instance. Only the owner can press that robot's control buttons.
 
 If an emailed Supabase invitation opens a 404 page, set Supabase Auth's **Site URL** and **Redirect URLs** to the deployed HTTPS origin, then send a new invitation. An old invitation can retain its old redirect destination.
 
@@ -93,6 +93,8 @@ Robots say what they just did in a speech bubble. The right-hand monitor on each
    - `Supabase project URL`, `Supabase publishable key`, and your own robot's token;
    - `Magic number`: **101** for Robot 01, **102** for Robot 02.
 5. Switch on **Algo Trading** in the MetaTrader toolbar. The chart shows `PAUSED | office link: ok`, and the robot appears in the office. Press **Start** there.
+
+**On a Mac:** download [OfficeRobot-source.zip](https://trading-office-puce.vercel.app/downloads/OfficeRobot-source.zip) directly from the office site. Unzip it. In MetaTrader 5 choose **File → Open Data Folder**, then copy the entire `OfficeRobot` folder to `MQL5/Experts`. Open `OfficeRobot.mq5` in MetaEditor and press F7 to compile. Add the Supabase URL to allowed WebRequest URLs, attach the robot to your own FTMO demo chart, set magic number **102** for Robot 02, paste your own token, and turn on Algo Trading. The Windows `install.ps1` script does not run on macOS. After editing robot source, regenerate the download with `tools/package-robot.ps1` before deploying.
 
 ## The four buttons
 

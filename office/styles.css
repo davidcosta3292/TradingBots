@@ -110,6 +110,24 @@ main { max-width: 1120px; margin: 0 auto; padding: 16px; }
 }
 
 /* Summary strip */
+.setup {
+  background: linear-gradient(110deg, rgba(227, 168, 43, .12), var(--panel) 58%);
+  border: 1px solid rgba(227, 168, 43, .45);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin: 0 0 16px;
+}
+.setup h2 { font: 600 19px var(--head); margin: 0 0 5px; }
+.setup p { color: var(--muted); margin: 0 0 12px; }
+.setup p:last-child { margin: 12px 0 0; }
+.setup form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.setup label { display: grid; gap: 5px; color: var(--muted); font-size: 13px; }
+.setup input { background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; color: var(--ink); font: inherit; padding: 9px 11px; }
+.setup button { background: var(--gold); color: #2b1e00; border: 0; border-radius: 9px; font: 600 13px var(--body); padding: 11px 14px; cursor: pointer; }
+.setup button:disabled { opacity: .5; cursor: wait; }
+.token-line { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.token-line code { overflow-wrap: anywhere; user-select: all; }
+
 .summary {
   display: flex;
   flex-wrap: wrap;
