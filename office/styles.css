@@ -118,11 +118,14 @@ main { max-width: 1120px; margin: 0 auto; padding: 16px; }
   margin: 0 0 16px;
 }
 .setup h2 { font: 600 19px var(--head); margin: 0 0 5px; }
+.setup .add-robot { background: transparent; color: var(--gold); border: 0; padding: 0; font: 600 15px var(--head); }
+.setup .add-robot small { color: var(--muted); font: 12px var(--body); margin-left: 10px; }
+.setup:has(.add-robot[aria-expanded="false"]) { background: var(--panel); border-color: var(--line); padding: 10px 16px; }
 .setup p { color: var(--muted); margin: 0 0 12px; }
 .setup p:last-child { margin: 12px 0 0; }
 .setup form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .setup label { display: grid; gap: 5px; color: var(--muted); font-size: 13px; }
-.setup input { background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; color: var(--ink); font: inherit; padding: 9px 11px; }
+.setup input, .setup select, .assignment-picker select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; color: var(--ink); font: inherit; padding: 9px 11px; }
 .setup button { background: var(--gold); color: #2b1e00; border: 0; border-radius: 9px; font: 600 13px var(--body); padding: 11px 14px; cursor: pointer; }
 .setup button:disabled { opacity: .5; cursor: wait; }
 .token-line { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
@@ -453,6 +456,7 @@ body[data-view="cards"] #scene-view { display: none; }
 .look-toggle .chev { margin-left: auto; }
 .swatch-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
 .look-body { display: grid; gap: 10px; margin-top: 10px; }
+.look-body small { color: var(--muted); font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .07em; }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatch {
   width: 26px;
@@ -474,6 +478,14 @@ body[data-view="cards"] #scene-view { display: none; }
   cursor: pointer;
 }
 .gear button.on { color: var(--gold); border-color: rgba(227, 168, 43, 0.6); }
+
+.assignment-note { padding: 14px; border: 1px solid rgba(200,154,255,.35); border-radius: 12px; background: rgba(200,154,255,.07); font-size: 13px; }
+.assignment-note b { color: #d8b9ff; }
+.assignment-note p { margin: 8px 0 0; color: var(--muted); }
+.assignment-picker { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
+.assignment-picker select { width: 100%; }
+.assignment-picker small { color: var(--faint); }
+.pill.planned { color: #d8b9ff; background: rgba(200,154,255,.12); }
 
 /* Office tools, the sound switch and the legend */
 .scene-tools { position: absolute; top: 12px; left: 12px; z-index: 2; display: flex; gap: 6px; }

@@ -3,6 +3,7 @@
 // in the list (sorted by name).
 
 export const COLORS = ['#E3A82B', '#3FB6C8', '#E0679B', '#7BD389', '#8A6CF0', '#5B8DEF', '#F08A4B', '#E9E6DF'];
+export const EYES = ['#9FE8FF', '#3DDC84', '#E3A82B', '#F08A4B', '#E0679B', '#EDEBE6'];
 
 export const GEAR = [
   { key: 'headset', label: 'Headset' },
@@ -10,6 +11,9 @@ export const GEAR = [
   { key: 'tie', label: 'Tie' },
   { key: 'visor', label: 'Visor' },
   { key: 'antennas', label: 'Antennas' },
+  { key: 'glasses', label: 'Glasses' },
+  { key: 'crown', label: 'Crown' },
+  { key: 'badge', label: 'Badge' },
   { key: 'none', label: 'None' },
 ];
 
@@ -20,5 +24,6 @@ export function lookOf(robot, index) {
   return {
     color: /^#[0-9a-f]{6}$/i.test(look.color || '') ? look.color : COLORS[index % COLORS.length],
     gear: GEAR_KEYS.includes(look.gear) ? look.gear : GEAR_KEYS[index % (GEAR_KEYS.length - 1)],
+    eyes: EYES.includes(look.eyes) ? look.eyes : EYES[0],
   };
 }

@@ -6,11 +6,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { MOODS, moodOf } from './moods.js?v=5';
-import { lookOf } from './looks.js?v=5';
+import { MOODS, moodOf } from './moods.js?v=8';
+import { lookOf } from './looks.js?v=8';
+import { assignmentOf } from './assignments.js?v=8';
 
-const ROOM = { w: 16, d: 12, h: 4.2 };
-const CORRIDOR_X = -1.4;
+const ROOM = { w: 25, d: 18, h: 4.6 };
+const CORRIDOR_X = -2.8;
 const WALK_SPEED = 2.6;
 const GOLD = '#E3A82B';
 const GREEN = '#3DDC84';
@@ -18,18 +19,14 @@ const RED = '#F06A5F';
 const INK = '#EDEBE6';
 const MUTED = '#8F96A2';
 const OFFLINE_BODY = new THREE.Color('#5A5F68');
-// Filled in order: back row first, then the front row, then a third column.
-const DESK_SLOTS = [
-  { x: 1.1, z: -3.3 }, { x: 4.0, z: -3.3 },
-  { x: 1.1, z: 1.0 }, { x: 4.0, z: 1.0 },
-  { x: 6.8, z: -3.3 }, { x: 6.8, z: 1.0 },
-];
+// Three generous rows of four, with a clear aisle to the lounge and coffee.
+const DESK_SLOTS = [-5.8, -0.8, 4.2].flatMap((z) => [0, 3.3, 6.6, 9.9].map((x) => ({ x, z })));
 // One sofa seat per robot, so nobody shuffles over when another sits down.
-const LOUNGE_SEATS = [-6.6, -5.35, -4.1, -2.85].map((x) => ({ x, z: 1.75 }));
+const LOUNGE_SEATS = [3.25, 6.6, 7.75].flatMap((z) => [-10.4, -8.8, -7.2, -5.6].map((x) => ({ x, z })));
 // Standing room at the coffee bar, for robots waiting for their trading hours.
-const COFFEE_SPOTS = [4.3, 5.4, 3.2].map((x) => ({ x, z: 4.05 }));
+const COFFEE_SPOTS = [-10.2, -8.9, -7.6, -6.3].map((x) => ({ x, z: -3.1 }));
 // The starting view, which "Overview" flies back to.
-const HOME = { target: new THREE.Vector3(0.2, 0.8, 0.2), offset: new THREE.Vector3(19.8, 17.7, 19.8), zoom: 1 };
+const HOME = { target: new THREE.Vector3(0, 0.8, 0), offset: new THREE.Vector3(30, 26, 30), zoom: 1 };
 const TOUR_STOP_MS = 7000;
 const BUBBLE_MS = 6000;
 
@@ -163,9 +160,9 @@ function buildRoom(scene) {
 
   // Big wall screen on the back wall.
   const wall = canvasTexture(1400, 440);
-  scene.add(box(7.4, 2.5, 0.12, material('#0A0C0F'), 3.2, 2.55, -d / 2 + 0.06));
-  const wallScreen = screenPlane(7.2, 2.3, wall.texture);
-  wallScreen.position.set(3.2, 2.55, -d / 2 + 0.125);
+  scene.add(box(8.2, 2.5, 0.12, material('#0A0C0F'), 5.1, 2.55, -d / 2 + 0.06));
+  const wallScreen = screenPlane(8.0, 2.3, wall.texture);
+  wallScreen.position.set(5.1, 2.55, -d / 2 + 0.125);
   scene.add(wallScreen);
 
   // Logo on the left wall.
@@ -173,7 +170,7 @@ function buildRoom(scene) {
   drawLogo(logo.ctx);
   logo.texture.needsUpdate = true;
   const logoPlane = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 2.3), new THREE.MeshBasicMaterial({ map: logo.texture, transparent: true }));
-  logoPlane.position.set(-w / 2 + 0.02, 2.6, -3.2);
+  logoPlane.position.set(-w / 2 + 0.02, 2.6, -5.4);
   logoPlane.rotation.y = Math.PI / 2;
   scene.add(logoPlane);
 
@@ -181,9 +178,9 @@ function buildRoom(scene) {
   const cities = [['PRAGUE', 'Europe/Prague'], ['LONDON', 'Europe/London'], ['NEW YORK', 'America/New_York']];
   const clocks = cities.map(([name, zone], i) => {
     const tex = canvasTexture(320, 200);
-    scene.add(box(0.06, 0.78, 1.18, material('#0A0C0F'), -w / 2 + 0.03, 2.75, 0.1 + i * 1.45));
+    scene.add(box(0.06, 0.78, 1.18, material('#0A0C0F'), -w / 2 + 0.03, 2.75, -3.1 + i * 1.45));
     const plane = screenPlane(1.1, 0.7, tex.texture);
-    plane.position.set(-w / 2 + 0.07, 2.75, 0.1 + i * 1.45);
+    plane.position.set(-w / 2 + 0.07, 2.75, -3.1 + i * 1.45);
     plane.rotation.y = Math.PI / 2;
     scene.add(plane);
     return { name, zone, tex };
@@ -208,25 +205,34 @@ function buildRoom(scene) {
   scene.add(box(0.5, 0.55, 0.5, material('#7CC7E6', { transparent: true, opacity: 0.85 }), w / 2 - 0.6, 1.48, -d / 2 + 0.6));
   addPlant(scene, -w / 2 + 0.6, d / 2 - 0.7);
   addPlant(scene, w / 2 - 0.6, d / 2 - 0.7);
-  addPlant(scene, -2.2, -d / 2 + 0.6);
+  addPlant(scene, -3.8, -d / 2 + 0.6);
 
   // Lounge: rug, sofa, coffee table, and the word on the floor.
-  const rug = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 4.4), new THREE.MeshStandardMaterial({ color: '#2B2A24', roughness: 1 }));
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(7.0, 6.0), new THREE.MeshStandardMaterial({ color: '#2B2A24', roughness: 1 }));
   rug.rotation.x = -Math.PI / 2;
-  rug.position.set(-4.8, 0.01, 3.0);
+  rug.position.set(-8.0, 0.01, 4.5);
   rug.receiveShadow = true;
   scene.add(rug);
-  scene.add(floorWord('L O U N G E', -4.8, 4.75));
+  scene.add(floorWord('L O U N G E', -8.0, 7.0));
   const sofa = material('#3B4150');
-  scene.add(box(5.2, 0.45, 1.0, sofa, -4.75, 0.225, 1.6));
-  scene.add(box(5.2, 0.95, 0.3, material('#353B48'), -4.75, 0.62, 1.0));
-  scene.add(box(0.3, 0.7, 1.3, sofa, -7.5, 0.35, 1.45));
-  scene.add(box(0.3, 0.7, 1.3, sofa, -2.0, 0.35, 1.45));
-  scene.add(box(2.0, 0.36, 0.9, material('#2F343E'), -4.8, 0.18, 3.6));
+  scene.add(box(6.6, 0.45, 1.0, sofa, -8.0, 0.225, 3.0));
+  scene.add(box(6.6, 0.95, 0.3, material('#353B48'), -8.0, 0.62, 2.4));
+  scene.add(box(0.3, 0.7, 1.3, sofa, -11.45, 0.35, 2.85));
+  scene.add(box(0.3, 0.7, 1.3, sofa, -4.55, 0.35, 2.85));
+  scene.add(box(2.6, 0.36, 1.0, material('#2F343E'), -8.0, 0.18, 5.3));
+  for (const x of [-10.4, -8.8, -7.2, -5.6]) {
+    scene.add(box(0.82, 0.25, 0.82, material('#444653'), x, 0.125, 6.6));
+    scene.add(box(0.82, 0.25, 0.82, material('#444653'), x, 0.125, 7.75));
+  }
+  // Low bookshelves and warm side lamps give the lounge its own visual zone.
+  for (const x of [-11.1, -4.9]) {
+    scene.add(box(0.65, 1.45, 0.68, material('#30343E'), x, 0.725, 5.2));
+    scene.add(box(0.35, 0.1, 0.35, material('#E3A82B', { emissive: '#8B5A12' }), x, 1.52, 5.2));
+  }
 
   // Coffee bar in the front corner, where robots wait for their trading hours.
-  scene.add(box(3.0, 0.98, 0.62, material('#343A44'), 5.0, 0.49, 4.95));
-  scene.add(box(3.12, 0.06, 0.74, material('#4B5260'), 5.0, 1.01, 4.95));
+  scene.add(box(5.4, 0.98, 0.7, material('#343A44'), -8.2, 0.49, -2.1));
+  scene.add(box(5.55, 0.06, 0.84, material('#4B5260'), -8.2, 1.01, -2.1));
   const signTex = canvasTexture(512, 96);
   signTex.ctx.font = font(58, 700);
   signTex.ctx.fillStyle = GOLD;
@@ -234,18 +240,24 @@ function buildRoom(scene) {
   signTex.ctx.fillText('C O F F E E', 256, 70);
   signTex.texture.needsUpdate = true;
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.36), new THREE.MeshBasicMaterial({ map: signTex.texture, transparent: true }));
-  sign.position.set(5.0, 0.56, 5.262);
+  sign.position.set(-8.2, 0.56, -1.73);
   scene.add(sign);
-  scene.add(box(0.5, 0.62, 0.42, material('#1E2228'), 6.05, 1.35, 4.9));
-  scene.add(box(0.3, 0.12, 0.12, material('#5B6272'), 6.05, 1.2, 5.13));
+  scene.add(box(0.5, 0.62, 0.42, material('#1E2228'), -6.3, 1.35, -2.1));
+  scene.add(box(0.3, 0.12, 0.12, material('#5B6272'), -6.3, 1.2, -1.84));
   const machineLed = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), new THREE.MeshBasicMaterial({ color: GREEN }));
-  machineLed.position.set(6.2, 1.54, 5.115);
+  machineLed.position.set(-6.15, 1.54, -1.84);
   scene.add(machineLed);
-  for (const [x, z] of [[4.05, 4.85], [4.3, 5.02]]) {
+  for (const [x, z] of [[-10.0, -2.1], [-9.65, -1.95]]) {
     const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.13, 14), material('#EDEAE3'));
     cup.position.set(x, 1.105, z);
     cup.castShadow = true;
     scene.add(cup);
+  }
+  // Menu board and stools make it read as a coffee bar, even at overview zoom.
+  scene.add(box(2.4, 1.1, 0.08, material('#15191D'), -8.3, 2.5, -2.7));
+  for (const x of [-9.8, -8.2, -6.6]) {
+    scene.add(box(0.12, 0.52, 0.12, material('#252B33'), x, 0.26, -4.45));
+    scene.add(box(0.65, 0.12, 0.65, material('#A16B3E'), x, 0.56, -4.45));
   }
 
   function drawClocks() {
@@ -404,7 +416,14 @@ function buildDesk(scene, slot) {
     ctx.fillText(MOODS[mood.key].label.toUpperCase(), W - 22, 42);
     ctx.textAlign = 'center';
 
-    if (mood.key === 'offline') {
+    if (mood.key === 'planned') {
+      ctx.fillStyle = MOODS.planned.color;
+      ctx.font = font(52, 700);
+      ctx.fillText('ROLE PLANNED', W / 2, 175);
+      ctx.fillStyle = MUTED;
+      ctx.font = font(25, 400);
+      ctx.fillText(fitText(ctx, assignmentOf(robot).label + ' · no runtime yet', W - 42), W / 2, 240);
+    } else if (mood.key === 'offline') {
       ctx.fillStyle = RED;
       ctx.font = font(64, 700);
       ctx.fillText('OFFLINE', W / 2, 190);
@@ -457,6 +476,17 @@ function buildDesk(scene, slot) {
     const currency = s.currency || 'USD';
     ctx.fillStyle = '#0A0E13';
     ctx.fillRect(0, 0, W, H);
+    if (mood.key === 'planned') {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = MOODS.planned.color;
+      ctx.font = font(32, 700);
+      ctx.fillText(assignmentOf(robot).label.toUpperCase(), W / 2, 130);
+      ctx.fillStyle = MUTED;
+      ctx.font = font(23, 400);
+      ctx.fillText('No account or agent connected', W / 2, 205);
+      tex.texture.needsUpdate = true;
+      return;
+    }
     ctx.textAlign = 'left';
     ctx.fillStyle = GOLD;
     ctx.font = font(26, 700);
@@ -572,10 +602,10 @@ function buildDesk(scene, slot) {
 // Robots: boxes and joints, animated by hand
 // ---------------------------------------------------------------------------
 
-function buildRobot(color, gear) {
+function buildRobot(color, gear, eyes) {
   const bodyMat = material(color);
   const darkMat = material('#14171C');
-  const eyeMat = new THREE.MeshBasicMaterial({ color: '#9FE8FF' });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: eyes });
   const lampMat = new THREE.MeshBasicMaterial({ color: GOLD });
 
   const root = new THREE.Group();
@@ -673,6 +703,15 @@ function addGear(gear, color, head, hips) {
       ball.position.set(side * 0.3, 0.87, 0);
       head.add(ball);
     }
+  } else if (gear === 'glasses') {
+    for (const x of [-0.14, 0.14]) head.add(box(0.22, 0.17, 0.05, dark, x, 0.31, 0.36));
+    head.add(box(0.12, 0.04, 0.06, dark, 0, 0.32, 0.37));
+  } else if (gear === 'crown') {
+    const crown = material('#E3A82B');
+    head.add(box(0.62, 0.12, 0.5, crown, 0, 0.65, 0));
+    for (const x of [-0.22, 0, 0.22]) head.add(box(0.1, 0.21, 0.1, crown, x, 0.81, 0));
+  } else if (gear === 'badge') {
+    hips.add(box(0.25, 0.18, 0.05, material('#E3A82B'), 0.28, 0.48, 0.33));
   }
 }
 
@@ -761,6 +800,7 @@ function placeFor(mood, i) {
     case 'active': return { spot: desk, pose: 'watch' };
     case 'blocked': return { spot: desk, pose: 'puzzled' };
     case 'standby': return { spot: coffeeSpot(COFFEE_SPOTS[i % COFFEE_SPOTS.length]), pose: 'sip' };
+    case 'planned': return { spot: loungeSpot(LOUNGE_SEATS[i % LOUNGE_SEATS.length]), pose: 'rest' };
     default: // paused or done for today: a trade still open keeps it at its desk
       return mood.inTrade ? { spot: desk, pose: 'watch' }
         : { spot: loungeSpot(LOUNGE_SEATS[i % LOUNGE_SEATS.length]), pose: 'rest' };
@@ -773,7 +813,7 @@ function placeFor(mood, i) {
 
 export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
@@ -803,8 +843,8 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   const sun = new THREE.DirectionalLight('#FFF1DD', 2.4);
   sun.position.set(9, 16, 8);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 60 });
+  sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 65 });
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.02;
   scene.add(sun);
@@ -856,16 +896,16 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     function paint() {
       model.lamp.material.color.set(MOODS[moodKey].color);
       model.bodyMat.color.copy(moodKey === 'offline' ? OFFLINE_BODY : model.baseColor);
-      model.eyeMat.color.set(moodKey === 'offline' ? '#3A404B' : '#9FE8FF');
+      model.eyeMat.color.set(moodKey === 'offline' ? '#3A404B' : look?.eyes || '#9FE8FF');
     }
 
     return {
       get color() { return look?.color; },
       get position() { return pos; },
       setLook(next) {
-        if (look && look.color === next.color && look.gear === next.gear) return;
+        if (look && look.color === next.color && look.gear === next.gear && look.eyes === next.eyes) return;
         const old = model;
-        model = buildRobot(next.color, next.gear);
+        model = buildRobot(next.color, next.gear, next.eyes);
         model.root.traverse((o) => { o.userData.robotId = id; });
         model.hips.add(tag, bubble);
         if (old) {
@@ -1012,8 +1052,8 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     ctx.fillText(money(total, currency, true), 40, 192);
     ctx.fillStyle = MUTED;
     ctx.font = font(30, 400);
-    const online = moods.filter((m) => m.key !== 'offline').length;
-    const trading = moods.filter((m) => m.key !== 'offline' && m.inTrade).length;
+    const online = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned').length;
+    const trading = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned' && m.inTrade).length;
     ctx.fillText(`${robots.length} robot${robots.length === 1 ? '' : 's'} · ${online} online · ${trading} in a trade`, 40, 246);
 
     // The last 7 days, from the trades the robots reported.
@@ -1181,7 +1221,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     if (!w || !h) return;
     renderer.setSize(w, h);
     labelRenderer.setSize(w, h);
-    const half = w < 700 ? 11.5 : 7.8;
+    const half = w < 700 ? 16.5 : 11.1;
     const aspect = w / h;
     camera.left = -half * aspect;
     camera.right = half * aspect;

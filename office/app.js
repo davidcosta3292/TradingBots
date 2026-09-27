@@ -3,8 +3,9 @@
 // robot's owner can press Start, Pause, Done for today and Close everything;
 // the robot confirms each press. Add ?demo to the address to preview with
 // sample robots, no Supabase needed.
-import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=5';
-import { COLORS, GEAR, lookOf } from './looks.js?v=5';
+import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=8';
+import { COLORS, EYES, GEAR, lookOf } from './looks.js?v=8';
+import { ASSIGNMENTS, assignmentOf, isTrader } from './assignments.js?v=8';
 import { play, setSound, soundOn } from './sounds.js?v=5';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -25,6 +26,7 @@ const EXIT_REASON = {
 };
 // What each place in the office means, for the legend.
 const LEGEND = [
+  ['planned', 'In the lounge', 'an assignment has been named, but no software runs it yet'],
   ['active', 'At its desk', 'working, looking for a setup'],
   ['trade', 'Typing at its desk', 'in a trade'],
   ['standby', 'At the coffee bar', 'on, but its own rules say "not now": outside its hours, market closed, or news. It carries on by itself.'],
@@ -48,6 +50,8 @@ let selectedId = null;
 let office = null;        // the 3D scene, loaded on first use
 let officeLoading = null;
 let newRobotToken = null;  // shown only in this browser until the page closes
+let setupOpen = false;
+const htmlCache = new WeakMap();
 const openLooks = new Set(); // robots whose look picker is open
 
 const $ = (id) => document.getElementById(id);
@@ -60,6 +64,7 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
 
 async function main() {
   document.addEventListener('click', onClick);
+  document.addEventListener('change', onChange);
   $('setup').addEventListener('submit', createMyRobot);
   $('legend').innerHTML = `<h3>Who is where</h3><ul>${LEGEND.map(([key, place, meaning]) =>
     `<li><i style="background:${MOODS[key].color}"></i><span><b>${place}</b> ${esc(meaning)}</span></li>`).join('')}</ul>`;
@@ -117,7 +122,7 @@ function startWorkspace() {
   let saved = null;
   try { saved = localStorage.getItem(VIEW_KEY); } catch { /* private window */ }
   setView(saved || (window.innerWidth >= 760 ? 'office' : 'cards'));
-  setInterval(render, 5000); // keeps "last seen", offline badges and clocks current
+  setInterval(render, 15000); // keep clocks/offline badges current without rebuilding cards every few seconds
 }
 
 function showLogin() {
@@ -176,7 +181,7 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=5')
+  officeLoading ??= import('./scene.js?v=8')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
@@ -358,6 +363,17 @@ function bubbleFor(event) {
 
 async function onClick(event) {
   const target = event.target;
+  if (target.closest('[data-add-robot]')) {
+    setupOpen = !setupOpen;
+    $('setup').dataset.mode = '';
+    return render();
+  }
+  if (target.closest('[data-dismiss-token]')) {
+    newRobotToken = null;
+    setupOpen = false;
+    $('setup').dataset.mode = '';
+    return render();
+  }
   if (target.closest('[data-copy-robot-token]')) {
     if (!newRobotToken) return;
     try {
@@ -426,20 +442,46 @@ async function onClick(event) {
   render();
 }
 
+async function onChange(event) {
+  const select = event.target.closest('select[data-assignment]');
+  if (!select) return;
+  const robot = store.robots.get(select.dataset.assignment);
+  if (!robot || robot.owner_id !== store.me?.id || robot.last_report_at) return;
+  const next = select.value;
+  if (DEMO) {
+    robot.assignment = next;
+    return render();
+  }
+  select.disabled = true;
+  const { data, error } = await sb.rpc('set_robot_assignment', { p_robot: robot.id, p_assignment: next });
+  if (error) {
+    select.disabled = false;
+    select.value = assignmentOf(robot).key;
+    return toast(`Could not change assignment: ${error.message}`);
+  }
+  robot.assignment = next;
+  if (data?.token) {
+    newRobotToken = { id: robot.id, name: robot.name, assignment: next, token: data.token };
+    setupOpen = true;
+  }
+  render();
+}
+
 async function createMyRobot(event) {
   event.preventDefault();
   if (DEMO || !sb || !store.me || newRobotToken) return;
-  if ([...store.robots.values()].some((r) => r.owner_id === store.me.id)) return;
   const form = event.target;
   const name = String(new FormData(form).get('name') || '').trim();
+  const assignment = String(new FormData(form).get('assignment') || 'trader');
   const button = form.querySelector('button[type="submit"]');
   button.disabled = true;
-  const { data, error } = await sb.rpc('create_my_robot', { p_name: name });
+  const { data, error } = await sb.rpc('create_my_robot', { p_name: name, p_assignment: assignment });
   if (error) {
     button.disabled = false;
     return toast(`Could not create your robot: ${error.message}`);
   }
   newRobotToken = data;
+  setupOpen = true;
   const { data: robot } = await sb.from('robots').select('*').eq('id', data.id).single();
   if (robot) store.robots.set(robot.id, robot);
   render();
@@ -465,22 +507,28 @@ function sortedRobots() {
   return [...store.robots.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function setHTML(element, html) {
+  if (htmlCache.get(element) === html) return;
+  element.innerHTML = html;
+  htmlCache.set(element, html);
+}
+
 function render() {
   const robots = sortedRobots();
   renderSetup(robots);
-  $('summary').innerHTML = summary(robots);
+  setHTML($('summary'), summary(robots));
 
   if (view === 'cards') {
-    $('robots').innerHTML = robots.length
+    setHTML($('robots'), robots.length
       ? robots.map(card).join('')
-      : '<p class="empty">No robots yet.</p>';
+      : '<p class="empty">No robots yet.</p>');
     return;
   }
 
   const robot = selectedId && store.robots.get(selectedId);
   $('panel').hidden = !robot;
   if (robot) {
-    $('panel').innerHTML = `<button class="panel-close" data-close-panel aria-label="Close">✕</button>${card(robot)}`;
+    setHTML($('panel'), `<button class="panel-close" data-close-panel aria-label="Close">✕</button>${card(robot)}`);
   }
   office?.update({ robots, selected: selectedId, history: historyOf, latest: latestEvent() });
 }
@@ -489,35 +537,42 @@ function renderSetup(robots) {
   const setup = $('setup');
   if (DEMO) return;
   if (newRobotToken) {
-    if (setup.dataset.mode === 'token') return;
-    setup.dataset.mode = 'token';
+    if (setup.dataset.mode === `token:${newRobotToken.id}`) return;
+    setup.dataset.mode = `token:${newRobotToken.id}`;
     setup.hidden = false;
-    setup.innerHTML = `<h2>${esc(newRobotToken.name)} is ready to connect</h2>
-      <p>This token is shown only now. Copy it and paste it into the <b>Robot token</b> input of OfficeRobot on your own MetaTrader 5 account.</p>
-      <div class="token-line"><code>${esc(newRobotToken.token)}</code><button type="button" data-copy-robot-token>Copy token</button></div>
+    const trader = newRobotToken.assignment === 'trader';
+    setup.innerHTML = `<h2>${esc(newRobotToken.name)} · ${esc(assignmentOf(newRobotToken).label)}</h2>
+      ${trader ? `<p>This token is shown only now. Copy it into the <b>Robot token</b> input of OfficeRobot on your own MetaTrader 5 account.</p>
+      <div class="token-line"><code>${esc(newRobotToken.token)}</code><button type="button" data-copy-robot-token>Copy token</button></div>`
+      : '<p>This role is an office assignment only. Its risk, coordination, or analysis software has not been built yet. The MetaTrader trading EA must not be attached to it.</p>'}
+      ${trader ? `
       <p><a href="downloads/OfficeRobot-source.zip" download>Download OfficeRobot source</a>. On Mac: in MetaTrader, open <b>File → Open Data Folder</b>, then copy the unzipped <code>OfficeRobot</code> folder into <code>MQL5/Experts</code>. Open <code>OfficeRobot.mq5</code> in MetaEditor and compile it with F7.</p>
-      <p>Attach it to your own FTMO demo chart. Set its magic number to <b>102</b>, allow WebRequest to <code>https://tpmrowyqsayyypkxkvfz.supabase.co</code>, paste your token, and enable Algo Trading. It starts paused; press Start here after it reports in.</p>`;
+      <p>Attach it to your own FTMO demo chart. Give each Trader EA a different magic number (101, 102, 103…), allow WebRequest to <code>https://tpmrowyqsayyypkxkvfz.supabase.co</code>, paste this token, and enable Algo Trading. It starts paused; press Start here after it reports in.</p>` : ''}
+      <button type="button" data-dismiss-token>${trader ? 'I copied the token' : 'Done'}</button>`;
     return;
   }
-  if (robots.some((r) => r.owner_id === store.me?.id)) {
-    setup.dataset.mode = 'owned';
+  const mine = robots.filter((r) => r.owner_id === store.me?.id).length;
+  if (mine >= 6) {
+    setup.dataset.mode = 'full';
     setup.hidden = true;
     return;
   }
-  if (setup.dataset.mode === 'new') return;
-  setup.dataset.mode = 'new';
+  if (setup.dataset.mode === (setupOpen ? 'open' : 'closed')) return;
+  setup.dataset.mode = setupOpen ? 'open' : 'closed';
   setup.hidden = false;
-  setup.innerHTML = `<h2>Add your robot</h2>
-    <p>This will create one robot owned by your login. Only you can press its trading controls. You will receive its MetaTrader connection token once.</p>
-    <form><label>Robot name <input name="name" maxlength="40" value="Robot 02" required></label>
-      <button type="submit">Create my robot</button></form>
-    <p><a href="downloads/OfficeRobot-source.zip" download>Download the robot source for MetaTrader 5</a> on your computer. No GitHub login is needed.</p>`;
+  setup.innerHTML = `<button type="button" class="add-robot" data-add-robot aria-expanded="${setupOpen}">
+    ${setupOpen ? '− Close' : '+ Add robot'} <small>${mine}/6 yours</small></button>
+    ${setupOpen ? `<p>Choose the assignment first. Trader works with the MetaTrader EA. Other roles are planning slots until their runtime is built.</p>
+      <form><label>Name <input name="name" maxlength="40" placeholder="e.g. Gold Trader" required></label>
+      <label>Assignment <select name="assignment">${ASSIGNMENTS.map((a) => `<option value="${a.key}">${a.label} · ${a.detail}</option>`).join('')}</select></label>
+      <button type="submit">Create robot</button></form>
+      <p><a href="downloads/OfficeRobot-source.zip" download>Download the Trader EA source</a> for MetaTrader 5.</p>` : ''}`;
 }
 
 function summary(robots) {
   const moods = robots.map((r) => moodOf(r));
-  const online = moods.filter((m) => m.key !== 'offline').length;
-  const trading = moods.filter((m) => m.key !== 'offline' && m.inTrade).length;
+  const online = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned').length;
+  const trading = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned' && m.inTrade).length;
   const prague = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
   const on = soundOn();
   return `<span><b>${robots.length}</b> robots</span>
@@ -538,6 +593,15 @@ function card(r) {
   const online = mood.key !== 'offline';
   const mine = store.me && r.owner_id === store.me.id;
   const owner = store.members.get(r.owner_id) || 'Unknown';
+  const assignment = assignmentOf(r);
+  if (!isTrader(r)) return `<article class="robot planned">
+    <header class="robot-head"><div><h2>${esc(r.name)}</h2>
+      <p class="sub">${esc(owner)}${mine ? ' · yours' : ' · view only'} · ${esc(assignment.label)}</p></div>
+      <span class="pill planned">Planned</span></header>
+    <div class="assignment-note"><b>${esc(assignment.label)} is an assignment, not a running agent yet.</b>
+      <p>No risk, coordination, or analysis program is connected. It does not watch accounts, send alerts, or place trades. Trader EAs enforce their own FTMO limits.</p></div>
+    ${mine ? assignmentPicker(r) + lookPicker(r) : ''}
+  </article>`;
   const positions = Array.isArray(s.positions) ? s.positions : [];
   const blocks = Array.isArray(s.blocks) ? s.blocks : [];
   const command = store.lastCommand.get(r.id);
@@ -549,7 +613,7 @@ function card(r) {
     <header class="robot-head">
       <div>
         <h2>${esc(r.name)}</h2>
-        <p class="sub">${esc(owner)}${mine ? ' · yours' : ' · view only'} · ${esc(r.symbol || '—')} ${esc(s.timeframe || '')}
+        <p class="sub">${esc(owner)}${mine ? ' · yours' : ' · view only'} · Trader · ${esc(r.symbol || '—')} ${esc(s.timeframe || '')}
           · account ${esc(r.account_login ?? '—')}</p>
       </div>
       <span class="pill ${mood.key}">${esc(mood.label)}</span>
@@ -583,11 +647,19 @@ function card(r) {
     ${command ? commandLine(command) : ''}
 
     ${tradeHistory(r, currency)}
+    ${mine ? assignmentPicker(r) : ''}
     ${mine ? lookPicker(r) : ''}
 
     ${events.length ? `<ol class="feed">${events.slice(0, 5).map((e) =>
       `<li><time>${clock(e.at)}</time>${esc(e.message)}</li>`).join('')}</ol>` : ''}
   </article>`;
+}
+
+function assignmentPicker(r) {
+  if (r.last_report_at) return '<p class="viewonly">Assignment is fixed after MetaTrader first connects.</p>';
+  return `<label class="assignment-picker">Assignment
+    <select data-assignment="${r.id}">${ASSIGNMENTS.map((a) => `<option value="${a.key}"${assignmentOf(r).key === a.key ? ' selected' : ''}>${a.label}</option>`).join('')}</select>
+    <small>Changing to Trader creates a new one-time MT5 token. Other roles are planning slots.</small></label>`;
 }
 
 function positionRow(p, r, currency) {
@@ -677,8 +749,13 @@ function lookPicker(r) {
       <i class="swatch-dot" style="background:${esc(look.color)}"></i>Look in the office · ${esc(gearLabel)}
       <span class="chev">${open ? '▴' : '▾'}</span></button>
     ${open ? `<div class="look-body">
+      <small>Body colour</small>
       <div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch${c.toLowerCase() === look.color.toLowerCase() ? ' on' : ''}"
         style="background:${c}" data-look="color" data-value="${c}" data-robot="${r.id}" aria-label="Colour ${c}"></button>`).join('')}</div>
+      <small>Eye colour</small>
+      <div class="swatches">${EYES.map((c) => `<button type="button" class="swatch${c.toLowerCase() === look.eyes.toLowerCase() ? ' on' : ''}"
+        style="background:${c}" data-look="eyes" data-value="${c}" data-robot="${r.id}" aria-label="Eye colour ${c}"></button>`).join('')}</div>
+      <small>Gear</small>
       <div class="gear">${GEAR.map((g) => `<button type="button" class="${g.key === look.gear ? 'on' : ''}"
         data-look="gear" data-value="${g.key}" data-robot="${r.id}">${g.label}</button>`).join('')}</div>
     </div>` : ''}

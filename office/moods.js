@@ -6,6 +6,7 @@
 export const OFFLINE_AFTER_MS = 75_000;
 
 export const MOODS = {
+  planned: { label: 'Role planned', color: '#C89AFF' },
   trade: { label: 'In a trade', color: '#3DDC84' },
   active: { label: 'Working', color: '#83A6F4' },
   standby: { label: 'Standing by', color: '#A58BF2' },
@@ -75,6 +76,8 @@ export function isOnline(robot, now = Date.now()) {
 
 // { key, label, block, inTrade }: key is one of MOODS.
 export function moodOf(robot, now = Date.now()) {
+  if (robot.assignment && robot.assignment !== 'trader')
+    return { key: 'planned', label: 'Role planned', block: null, inTrade: false };
   const s = robot.status || {};
   const inTrade = Array.isArray(s.positions) && s.positions.length > 0;
   const withTrade = (label) => (inTrade ? `${label} · trade open` : label);
