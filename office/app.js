@@ -87,9 +87,16 @@ async function main() {
   store.me = session.user;
 
   try {
-    await loadAll();
+    await loadAllWithRetry();
+    $('message').hidden = true;
   } catch (error) {
-    return showMessage(`<h1>Could not load the office</h1><p>${esc(error.message)}</p>`);
+    if (isJwtClockError(error)) {
+      return showMessage(`<h1>Supabase is still checking this sign-in</h1>
+        <p>The data API returned “JWT issued at future” after several retries. This can happen when its token validator is behind the service that issued the token.</p>
+        <p><button class="link" data-retry-load>Try again</button> · <button class="link" data-signout>Sign out</button></p>`);
+    }
+    return showMessage(`<h1>Could not load the office</h1><p>${esc(error.message)}</p>
+      <p><button class="link" data-retry-load>Try again</button></p>`);
   }
   if (!store.members.has(store.me.id)) {
     return showMessage(`<h1>Not in the office yet</h1>
@@ -125,6 +132,24 @@ function showLogin() {
 function showMessage(html) {
   $('message').innerHTML = html;
   $('message').hidden = false;
+}
+
+function isJwtClockError(error) {
+  return /JWT issued at future/i.test(String(error?.message || ''));
+}
+
+async function loadAllWithRetry() {
+  const delays = [1500, 3500, 7000, 12000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await loadAll();
+    } catch (error) {
+      if (!isJwtClockError(error) || attempt === delays.length) throw error;
+      showMessage(`<h1>Connecting to the office</h1>
+        <p>Supabase is checking the new sign-in. Retrying automatically (${attempt + 1}/${delays.length})…</p>`);
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -335,6 +360,7 @@ async function onClick(event) {
   if (viewButton) return setView(viewButton.dataset.view);
 
   if (target.closest('[data-signout]')) return sb?.auth.signOut();
+  if (target.closest('[data-retry-load]')) return location.reload();
   if (target.closest('[data-close-panel]')) return select(null);
 
   if (target.closest('[data-sound]')) {
