@@ -86,7 +86,16 @@ This is the skeleton everything else hangs on, built before the strategy exists.
 
 ### M4 · The 3D office (while the M3 demo weeks run)
 
-**Status (25 Sep):** version 1 is built into the control page (Office view). The robots and desks work, along with the lounge, the offline look, the wall screen, and the four buttons in a side panel. Still to come: a camera tour, music, custom characters, and a trade history chart.
+**Status (27 Sep):** version 2 is built on top of version 1.
+- **Version 1 (25 Sep):** the robots and desks, the lounge, the offline look, the wall screen, and the four buttons in a side panel.
+- **Version 2 (27 Sep):**
+  - A coffee bar where a switched-on robot waits when its own rules say "not now" (outside its hours, market closed, news). Before this, the office said "Working" at night.
+  - Speech bubbles for what each robot just did, and a trade history chart on each desk and card.
+  - A camera tour, and the camera following the selected robot.
+  - Optional sounds, and a colour and gear per robot, chosen by its owner.
+- **Still to come:** the page online, for phones.
+
+Telegram now also reports every button press the robot answers, and every trade it opens or closes, the moment it happens.
 
 - A Claw3D-based office. A robot sits at its desk when it's in a trade, waits in the lounge otherwise, and turns red when its heartbeat is lost.
 - Clicking a robot opens its panel: P&L, positions and the four buttons, using the same commands as M1.

@@ -1,27 +1,23 @@
 // The Trading Office in 3D.
-// One desk per robot. A robot sits at its desk while it works or holds a trade,
-// and walks to the lounge when it is paused or done for the day. An offline
-// robot dozes at its desk with a red lamp. Every screen shows only what the
-// robots themselves report.
+// One desk per robot. A robot works at its desk, waits at the coffee bar when
+// its own rules say "not now" (outside its hours, market closed, news), sits
+// on the lounge sofa when we pause it, and dozes grey at its desk when
+// MetaTrader stops reporting. Every screen shows only what the robots report.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { MOODS, moodOf } from './moods.js?v=5';
+import { lookOf } from './looks.js?v=5';
 
-const OFFLINE_AFTER_MS = 75_000;
 const ROOM = { w: 16, d: 12, h: 4.2 };
-const CORRIDOR_X = -1.5;
+const CORRIDOR_X = -1.4;
 const WALK_SPEED = 2.6;
 const GOLD = '#E3A82B';
 const GREEN = '#3DDC84';
 const RED = '#F06A5F';
-const ROBOT_COLORS = ['#E3A82B', '#3FB6C8', '#E0679B', '#7BD389', '#8A6CF0', '#F08A4B'];
-const MOODS = {
-  trade: { label: 'In a trade', lamp: GREEN },
-  active: { label: 'Working', lamp: '#83A6F4' },
-  paused: { label: 'Paused', lamp: GOLD },
-  done: { label: 'Done for today', lamp: '#9097A3' },
-  offline: { label: 'Offline', lamp: RED },
-};
+const INK = '#EDEBE6';
+const MUTED = '#8F96A2';
+const OFFLINE_BODY = new THREE.Color('#5A5F68');
 // Filled in order: back row first, then the front row, then a third column.
 const DESK_SLOTS = [
   { x: 1.1, z: -3.3 }, { x: 4.0, z: -3.3 },
@@ -30,6 +26,12 @@ const DESK_SLOTS = [
 ];
 // One sofa seat per robot, so nobody shuffles over when another sits down.
 const LOUNGE_SEATS = [-6.6, -5.35, -4.1, -2.85].map((x) => ({ x, z: 1.75 }));
+// Standing room at the coffee bar, for robots waiting for their trading hours.
+const COFFEE_SPOTS = [4.3, 5.4, 3.2].map((x) => ({ x, z: 4.05 }));
+// The starting view, which "Overview" flies back to.
+const HOME = { target: new THREE.Vector3(0.2, 0.8, 0.2), offset: new THREE.Vector3(19.8, 17.7, 19.8), zoom: 1 };
+const TOUR_STOP_MS = 7000;
+const BUBBLE_MS = 6000;
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -42,12 +44,10 @@ function money(value, currency = 'USD', signed = false) {
   return (n > 0 ? '+' : n < 0 ? '−' : '') + text;
 }
 
-function moodOf(robot, now) {
-  const online = robot.last_report_at && now - Date.parse(robot.last_report_at) < OFFLINE_AFTER_MS;
-  if (!online) return 'offline';
-  const inTrade = (robot.status?.positions || []).length > 0;
-  if (robot.state === 'active') return inTrade ? 'trade' : 'active';
-  return robot.state === 'done_today' ? 'done' : 'paused';
+const toneColor = (n) => (n > 0 ? GREEN : n < 0 ? RED : INK);
+
+function pragueClock(date = new Date()) {
+  return date.toLocaleTimeString('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
 }
 
 // ---------------------------------------------------------------------------
@@ -77,8 +77,7 @@ function canvasTexture(width, height) {
 }
 
 function screenPlane(width, height, texture) {
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: texture }));
-  return mesh;
+  return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: texture }));
 }
 
 function font(size, weight = 600) {
@@ -92,12 +91,33 @@ function fitText(ctx, text, maxWidth) {
   return `${out}…`;
 }
 
+// Draws [text, colour, font] pieces one after another on a line, and returns
+// where the line ends.
+function runs(ctx, x, y, pieces) {
+  ctx.textAlign = 'left';
+  for (const [text, color, style] of pieces) {
+    ctx.fillStyle = color;
+    ctx.font = style;
+    ctx.fillText(text, x, y);
+    x += ctx.measureText(text).width;
+  }
+  return x;
+}
+
 function bar(ctx, x, y, w, h, pct) {
   const value = Math.max(0, Math.min(100, Number(pct) || 0));
   ctx.fillStyle = '#1C2129';
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = value >= 80 ? RED : value >= 50 ? GOLD : GREEN;
   ctx.fillRect(x, y, Math.max(3, (w * value) / 100), h);
+}
+
+function disposeTree(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.geometry.dispose();
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -196,29 +216,44 @@ function buildRoom(scene) {
   rug.position.set(-4.8, 0.01, 3.0);
   rug.receiveShadow = true;
   scene.add(rug);
-  const loungeText = canvasTexture(512, 128);
-  loungeText.ctx.font = font(78, 700);
-  loungeText.ctx.fillStyle = 'rgba(227,168,43,0.8)';
-  loungeText.ctx.textAlign = 'center';
-  loungeText.ctx.fillText('L O U N G E', 256, 92);
-  loungeText.texture.needsUpdate = true;
-  const loungeLabel = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: loungeText.texture, transparent: true }));
-  loungeLabel.rotation.x = -Math.PI / 2;
-  loungeLabel.position.set(-4.8, 0.02, 4.75);
-  scene.add(loungeLabel);
+  scene.add(floorWord('L O U N G E', -4.8, 4.75));
   const sofa = material('#3B4150');
   scene.add(box(5.2, 0.45, 1.0, sofa, -4.75, 0.225, 1.6));
   scene.add(box(5.2, 0.95, 0.3, material('#353B48'), -4.75, 0.62, 1.0));
   scene.add(box(0.3, 0.7, 1.3, sofa, -7.5, 0.35, 1.45));
   scene.add(box(0.3, 0.7, 1.3, sofa, -2.0, 0.35, 1.45));
-  scene.add(box(2.0, 0.36, 0.9, material('#2F343E'), -4.8, 0.18, 3.35));
+  scene.add(box(2.0, 0.36, 0.9, material('#2F343E'), -4.8, 0.18, 3.6));
+
+  // Coffee bar in the front corner, where robots wait for their trading hours.
+  scene.add(box(3.0, 0.98, 0.62, material('#343A44'), 5.0, 0.49, 4.95));
+  scene.add(box(3.12, 0.06, 0.74, material('#4B5260'), 5.0, 1.01, 4.95));
+  const signTex = canvasTexture(512, 96);
+  signTex.ctx.font = font(58, 700);
+  signTex.ctx.fillStyle = GOLD;
+  signTex.ctx.textAlign = 'center';
+  signTex.ctx.fillText('C O F F E E', 256, 70);
+  signTex.texture.needsUpdate = true;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.36), new THREE.MeshBasicMaterial({ map: signTex.texture, transparent: true }));
+  sign.position.set(5.0, 0.56, 5.262);
+  scene.add(sign);
+  scene.add(box(0.5, 0.62, 0.42, material('#1E2228'), 6.05, 1.35, 4.9));
+  scene.add(box(0.3, 0.12, 0.12, material('#5B6272'), 6.05, 1.2, 5.13));
+  const machineLed = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), new THREE.MeshBasicMaterial({ color: GREEN }));
+  machineLed.position.set(6.2, 1.54, 5.115);
+  scene.add(machineLed);
+  for (const [x, z] of [[4.05, 4.85], [4.3, 5.02]]) {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.13, 14), material('#EDEAE3'));
+    cup.position.set(x, 1.105, z);
+    cup.castShadow = true;
+    scene.add(cup);
+  }
 
   function drawClocks() {
     for (const { name, zone, tex } of clocks) {
       const { ctx } = tex;
       ctx.fillStyle = '#0A0C0F';
       ctx.fillRect(0, 0, 320, 200);
-      ctx.fillStyle = '#8F96A2';
+      ctx.fillStyle = MUTED;
       ctx.font = font(34);
       ctx.textAlign = 'center';
       ctx.fillText(name, 160, 62);
@@ -242,6 +277,19 @@ function buildRoom(scene) {
   }
 
   return { wall, drawClocks, blink };
+}
+
+function floorWord(text, x, z) {
+  const tex = canvasTexture(512, 128);
+  tex.ctx.font = font(78, 700);
+  tex.ctx.fillStyle = 'rgba(227,168,43,0.8)';
+  tex.ctx.textAlign = 'center';
+  tex.ctx.fillText(text, 256, 92);
+  tex.texture.needsUpdate = true;
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: tex.texture, transparent: true }));
+  label.rotation.x = -Math.PI / 2;
+  label.position.set(x, 0.02, z);
+  return label;
 }
 
 function drawLogo(ctx) {
@@ -340,6 +388,8 @@ function buildDesk(scene, slot) {
     const s = robot.status || {};
     const currency = s.currency || 'USD';
     const positions = s.positions || [];
+    const tint = MOODS[mood.key].color;
+    const day = Number(s.day_pnl ?? 0);
     ctx.fillStyle = '#0A0E13';
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#141A22';
@@ -347,18 +397,18 @@ function buildDesk(scene, slot) {
     ctx.textAlign = 'left';
     ctx.fillStyle = color;
     ctx.font = font(34, 700);
-    ctx.fillText(fitText(ctx, robot.name, W * 0.55), 22, 44);
+    ctx.fillText(fitText(ctx, robot.name, W * 0.5), 22, 44);
     ctx.textAlign = 'right';
-    ctx.fillStyle = MOODS[mood].lamp;
+    ctx.fillStyle = tint;
     ctx.font = font(26);
-    ctx.fillText(MOODS[mood].label.toUpperCase(), W - 22, 42);
+    ctx.fillText(MOODS[mood.key].label.toUpperCase(), W - 22, 42);
     ctx.textAlign = 'center';
 
-    if (mood === 'offline') {
+    if (mood.key === 'offline') {
       ctx.fillStyle = RED;
       ctx.font = font(64, 700);
       ctx.fillText('OFFLINE', W / 2, 190);
-      ctx.fillStyle = '#8F96A2';
+      ctx.fillStyle = MUTED;
       ctx.font = font(26, 400);
       ctx.fillText('No report from MetaTrader', W / 2, 250);
     } else if (positions.length) {
@@ -367,23 +417,33 @@ function buildDesk(scene, slot) {
       ctx.fillStyle = p.side === 'buy' ? GREEN : RED;
       ctx.font = font(34, 700);
       ctx.fillText(`${String(p.side).toUpperCase()} ${p.volume} ${robot.symbol || ''}`, W / 2, 120);
-      ctx.fillStyle = pnl > 0 ? GREEN : pnl < 0 ? RED : '#EDEBE6';
+      ctx.fillStyle = toneColor(pnl);
       ctx.font = font(84, 700);
       ctx.fillText(money(pnl, currency, true), W / 2, 215);
-      ctx.fillStyle = '#8F96A2';
+      ctx.fillStyle = MUTED;
       ctx.font = font(24, 400);
       ctx.fillText(`open ${p.open} · stop ${p.sl} · target ${p.tp}`, W / 2, 280);
+    } else if (mood.key === 'standby' || mood.key === 'blocked') {
+      ctx.fillStyle = tint;
+      ctx.font = font(54, 700);
+      ctx.fillText(fitText(ctx, mood.label.toUpperCase(), W - 40), W / 2, 150);
+      ctx.fillStyle = INK;
+      ctx.font = font(28, 400);
+      const line = mood.key === 'blocked' ? 'Needs you: see its card' : mood.block?.back || 'Carries on by itself';
+      ctx.fillText(fitText(ctx, line, W - 40), W / 2, 210);
+      ctx.fillStyle = MUTED;
+      ctx.font = font(26, 400);
+      ctx.fillText(`Today ${money(day, currency, true)}`, W / 2, 272);
     } else {
-      const day = Number(s.day_pnl ?? 0);
-      ctx.fillStyle = '#8F96A2';
+      ctx.fillStyle = MUTED;
       ctx.font = font(26);
       ctx.fillText('TODAY', W / 2, 122);
-      ctx.fillStyle = day > 0 ? GREEN : day < 0 ? RED : '#EDEBE6';
+      ctx.fillStyle = toneColor(day);
       ctx.font = font(84, 700);
       ctx.fillText(money(day, currency, true), W / 2, 210);
-      ctx.fillStyle = '#8F96A2';
+      ctx.fillStyle = MUTED;
       ctx.font = font(26, 400);
-      const line = mood === 'active' ? 'Waiting for a setup' : mood === 'done' ? 'Done for today' : 'Paused';
+      const line = mood.key === 'active' ? 'Looking for a setup' : mood.key === 'done' ? 'Done for today' : 'Paused';
       ctx.fillText(line, W / 2, 272);
     }
     tex.texture.needsUpdate = true;
@@ -401,20 +461,87 @@ function buildDesk(scene, slot) {
     ctx.fillStyle = GOLD;
     ctx.font = font(26, 700);
     ctx.fillText('FTMO LIMITS', 24, 44);
-    ctx.fillStyle = '#EDEBE6';
+    ctx.fillStyle = INK;
     ctx.font = font(24, 400);
     ctx.fillText(`Daily loss used ${Math.round(Number(s.daily_used_pct) || 0)}%`, 24, 94);
     bar(ctx, 24, 106, W - 48, 16, s.daily_used_pct);
     ctx.fillText(`Max loss used ${Math.round(Number(s.max_used_pct) || 0)}%`, 24, 160);
     bar(ctx, 24, 172, W - 48, 16, s.max_used_pct);
-    ctx.fillStyle = '#8F96A2';
+    ctx.fillStyle = MUTED;
     ctx.fillText(`Equity ${money(s.equity, currency)} · trades today ${s.trades_today ?? 0}`, 24, 230);
-    const note = mood === 'offline' ? 'Waiting for MetaTrader'
+    const note = mood.key === 'offline' ? 'Waiting for MetaTrader'
       : (s.blocks || [])[0] ? `Holding back: ${(s.blocks || [])[0]}`
         : s.last_action || 'Ready';
     ctx.fillStyle = '#6F7682';
     ctx.font = font(22, 400);
     ctx.fillText(fitText(ctx, note, W - 48), 24, 290);
+    tex.texture.needsUpdate = true;
+  }
+
+  // The robot's closed trades of the last 7 days, as a running total.
+  function drawHistory(tex, robot, history) {
+    const { ctx, canvas } = tex;
+    const W = canvas.width;
+    const H = canvas.height;
+    const currency = robot.status?.currency || 'USD';
+    const trades = history.trades;
+    ctx.fillStyle = '#0A0E13';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = GOLD;
+    ctx.font = font(26, 700);
+    ctx.fillText('LAST 7 DAYS', 24, 44);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = trades.length ? toneColor(history.total) : MUTED;
+    ctx.font = font(34, 700);
+    ctx.fillText(trades.length ? money(history.total, currency, true) : '—', W - 24, 46);
+    if (!trades.length) {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = MUTED;
+      ctx.font = font(26, 400);
+      ctx.fillText('No closed trades yet', W / 2, 196);
+      tex.texture.needsUpdate = true;
+      return;
+    }
+    const points = [0];
+    for (const trade of trades) points.push(points[points.length - 1] + trade.net);
+    const [x0, x1, y0, y1] = [28, W - 28, 84, 250];
+    const low = Math.min(0, ...points);
+    const high = Math.max(0, ...points);
+    const span = high - low || 1;
+    const X = (i) => x0 + (i * (x1 - x0)) / Math.max(1, points.length - 1);
+    const Y = (v) => y0 + ((high - v) * (y1 - y0)) / span;
+    ctx.strokeStyle = '#2A2F38';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    ctx.moveTo(x0, Y(0));
+    ctx.lineTo(x1, Y(0));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const color = points[points.length - 1] >= 0 ? GREEN : RED;
+    ctx.beginPath();
+    points.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.lineTo(X(points.length - 1), Y(0));
+    ctx.lineTo(X(0), Y(0));
+    ctx.closePath();
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    trades.forEach((trade, i) => {
+      ctx.fillStyle = trade.net >= 0 ? GREEN : RED;
+      ctx.beginPath();
+      ctx.arc(X(i + 1), Y(points[i + 1]), 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.textAlign = 'left';
+    ctx.fillStyle = MUTED;
+    ctx.font = font(24, 400);
+    ctx.fillText(`${trades.length} trade${trades.length === 1 ? '' : 's'} · ${history.wins} won · ${trades.length - history.wins} lost`, 24, 300);
     tex.texture.needsUpdate = true;
   }
 
@@ -424,19 +551,19 @@ function buildDesk(scene, slot) {
     slot,
     setVisible(on) {
       group.visible = on;
-      freeEl.style.display = on ? '' : 'none';
     },
-    assign(robot, color, mood) {
+    assign(robot, color, mood, history) {
+      freeTag.visible = !robot;
       if (!robot) {
         accentMat.color.set('#3A404B');
         screens.forEach(drawOff);
-        freeEl.style.display = group.visible ? '' : 'none';
         return;
       }
       accentMat.color.set(color);
-      freeEl.style.display = 'none';
       drawMain(screens[0], robot, mood, color);
-      drawLimits(screens[1], robot, mood);
+      // The right-hand monitor takes turns: FTMO limits, then the last 7 days.
+      if (history && Math.floor(Date.now() / 10_000) % 2 === 1) drawHistory(screens[1], robot, history);
+      else drawLimits(screens[1], robot, mood);
     },
   };
 }
@@ -445,7 +572,7 @@ function buildDesk(scene, slot) {
 // Robots: boxes and joints, animated by hand
 // ---------------------------------------------------------------------------
 
-function buildRobot(color) {
+function buildRobot(color, gear) {
   const bodyMat = material(color);
   const darkMat = material('#14171C');
   const eyeMat = new THREE.MeshBasicMaterial({ color: '#9FE8FF' });
@@ -496,13 +623,66 @@ function buildRobot(color) {
   lamp.position.y = 0.85;
   head.add(lamp);
 
-  return { root, hips, legL, legR, armL, armR, head, lamp, bodyMat, eyeMat, baseColor: new THREE.Color(color) };
+  // A coffee cup in the right hand, only at the coffee bar.
+  const cup = new THREE.Group();
+  cup.add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.062, 0.15, 14), material('#EDEAE3')));
+  const coffee = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.066, 0.01, 14), new THREE.MeshBasicMaterial({ color: '#4A2F1E' }));
+  coffee.position.y = 0.072;
+  cup.add(coffee);
+  cup.position.set(0, -0.56, 0.08);
+  cup.visible = false;
+  armR.add(cup);
+
+  addGear(gear, color, head, hips);
+
+  return { root, hips, legL, legR, armL, armR, head, lamp, cup, bodyMat, eyeMat,
+    baseColor: new THREE.Color(color), seed: Math.random() * 10 };
+}
+
+function addGear(gear, color, head, hips) {
+  const dark = material('#262B33');
+  if (gear === 'headset') {
+    head.add(box(0.86, 0.07, 0.12, dark, 0, 0.64, 0));
+    for (const side of [-1, 1]) {
+      head.add(box(0.07, 0.3, 0.12, dark, side * 0.45, 0.5, 0));
+      head.add(box(0.13, 0.28, 0.28, dark, side * 0.47, 0.3, 0));
+    }
+    head.add(box(0.04, 0.04, 0.3, dark, -0.47, 0.17, 0.2));
+    const mic = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.06), new THREE.MeshBasicMaterial({ color: GREEN }));
+    mic.position.set(-0.44, 0.17, 0.36);
+    head.add(mic);
+  } else if (gear === 'cap') {
+    const cap = material('#2B3445');
+    head.add(box(0.8, 0.14, 0.66, cap, 0, 0.65, 0));
+    head.add(box(0.62, 0.04, 0.32, cap, 0, 0.6, 0.46));
+  } else if (gear === 'tie') {
+    const tie = material('#C8453C');
+    hips.add(box(0.12, 0.08, 0.04, tie, 0, 0.66, 0.3));
+    hips.add(box(0.14, 0.36, 0.03, tie, 0, 0.42, 0.31));
+  } else if (gear === 'visor') {
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.17, 0.05),
+      new THREE.MeshBasicMaterial({ color: '#5CF2FF', transparent: true, opacity: 0.85 }));
+    visor.position.set(0, 0.31, 0.33);
+    head.add(visor);
+  } else if (gear === 'antennas') {
+    for (const side of [-1, 1]) {
+      const stalk = box(0.035, 0.3, 0.035, dark, side * 0.24, 0.72, 0);
+      stalk.rotation.z = -side * 0.35;
+      head.add(stalk);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), material(color));
+      ball.position.set(side * 0.3, 0.87, 0);
+      head.add(ball);
+    }
+  }
 }
 
 function applyPose(model, pose, t) {
-  const { legL, legR, armL, armR, head, hips } = model;
+  const { legL, legR, armL, armR, head, hips, cup } = model;
   head.rotation.set(0, 0, 0);
+  armL.rotation.set(0, 0, 0);
+  armR.rotation.set(0, 0, 0);
   hips.position.y = 0.55;
+  cup.visible = pose === 'sip';
   if (pose === 'walk') {
     const s = Math.sin(t * 9);
     legL.rotation.x = s * 0.6;
@@ -510,6 +690,20 @@ function applyPose(model, pose, t) {
     armL.rotation.x = -s * 0.5;
     armR.rotation.x = s * 0.5;
     hips.position.y = 0.55 + Math.abs(Math.cos(t * 9)) * 0.05;
+    return;
+  }
+  if (pose === 'sip') {
+    // Standing at the coffee bar, with a sip every few seconds.
+    legL.rotation.x = 0;
+    legR.rotation.x = 0;
+    const phase = (t + model.seed) % 7;
+    const lift = phase < 1.6 ? Math.sin((phase / 1.6) * Math.PI) : 0;
+    armL.rotation.x = -0.12;
+    armR.rotation.x = -1.15 - 1.2 * lift;
+    cup.rotation.x = -armR.rotation.x;
+    head.rotation.x = -0.2 * lift;
+    head.rotation.y = (1 - lift) * Math.sin(t * 0.45 + model.seed) * 0.4;
+    hips.position.y = 0.55 + Math.sin(t * 1.1 + model.seed) * 0.01;
     return;
   }
   // Every other pose is seated: legs forward.
@@ -523,6 +717,11 @@ function applyPose(model, pose, t) {
     armL.rotation.x = -1.05;
     armR.rotation.x = -1.05;
     head.rotation.y = Math.sin(t * 0.7) * 0.25;
+  } else if (pose === 'puzzled') {
+    // Scratching its head: something outside the robot stops it trading.
+    armL.rotation.x = -1.05;
+    armR.rotation.x = -2.5 + Math.sin(t * 6) * 0.08;
+    head.rotation.z = Math.sin(t * 1.8) * 0.18;
   } else if (pose === 'rest') {
     armL.rotation.x = -0.1;
     armR.rotation.x = -0.1;
@@ -541,19 +740,38 @@ function lerpAngle(a, b, k) {
   return a + diff * k;
 }
 
+// Where a robot sits or stands, and the point in the aisle it walks in from.
 function deskSpot(slot) {
   return { x: slot.x, z: slot.z + 1.05, facing: Math.PI, y: 0, approach: { x: slot.x, z: slot.z + 2.0 } };
 }
 
 function loungeSpot(seat) {
-  return { x: seat.x, z: seat.z, facing: 0, y: -0.1, approach: { x: seat.x, z: seat.z + 0.95 } };
+  return { x: seat.x, z: seat.z, facing: 0, y: -0.1, approach: { x: seat.x, z: seat.z + 0.87 } };
+}
+
+function coffeeSpot(spot) {
+  return { x: spot.x, z: spot.z, facing: 0, y: 0, approach: { x: spot.x, z: 3.0 } };
+}
+
+function placeFor(mood, i) {
+  const desk = deskSpot(DESK_SLOTS[i]);
+  switch (mood.key) {
+    case 'offline': return { spot: desk, pose: 'sleep' };
+    case 'trade': return { spot: desk, pose: 'type' };
+    case 'active': return { spot: desk, pose: 'watch' };
+    case 'blocked': return { spot: desk, pose: 'puzzled' };
+    case 'standby': return { spot: coffeeSpot(COFFEE_SPOTS[i % COFFEE_SPOTS.length]), pose: 'sip' };
+    default: // paused or done for today: a trade still open keeps it at its desk
+      return mood.inTrade ? { spot: desk, pose: 'watch' }
+        : { spot: loungeSpot(LOUNGE_SEATS[i % LOUNGE_SEATS.length]), pose: 'rest' };
+  }
 }
 
 // ---------------------------------------------------------------------------
 // The office
 // ---------------------------------------------------------------------------
 
-export function createOfficeScene(container, { onSelect }) {
+export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -568,9 +786,9 @@ export function createOfficeScene(container, { onSelect }) {
   scene.background = new THREE.Color('#0B0D11');
 
   const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
-  camera.position.set(20, 18.5, 20);
+  camera.position.copy(HOME.target).add(HOME.offset);
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0.2, 0.8, 0.2);
+  controls.target.copy(HOME.target);
   controls.enableDamping = true;
   controls.minZoom = 0.7;
   controls.maxZoom = 2.8;
@@ -602,33 +820,69 @@ export function createOfficeScene(container, { onSelect }) {
   scene.add(ring);
 
   const actors = new Map();
-  let selectedId = null;
+  let order = [];          // robot ids by name, for the tour
+  let selectedId = null;   // the robot whose card is open
+  let tourId = null;       // the robot the tour is showing
+  let tourTimer = null;
+  let cam = null;          // where the camera is gliding: { follow, zoom } or { target, offset, zoom }
 
-  function createActor(robot, color, index) {
-    const model = buildRobot(color);
-    model.root.traverse((o) => { o.userData.robotId = robot.id; });
-    scene.add(model.root);
+  const spotlightId = () => selectedId ?? tourId;
 
+  function createActor(id, index) {
     const tagEl = document.createElement('div');
     tagEl.className = 'tag';
-    tagEl.addEventListener('click', (e) => { e.stopPropagation(); onSelect(robot.id); });
+    tagEl.addEventListener('click', (e) => { e.stopPropagation(); onSelect(id); });
     const tag = new CSS2DObject(tagEl);
-    tag.position.set(0, 2.05 + (index % 2) * 0.5, 0); // alternate heights so neighbours' tags don't overlap
-    model.hips.add(tag);
+    const tagY = 2.05 + (index % 2) * 0.5; // alternate heights so neighbours' tags don't overlap
+    tag.position.set(0, tagY, 0);
 
+    // What the robot just did, in a speech bubble above its name tag.
+    const bubbleEl = document.createElement('div');
+    bubbleEl.className = 'bubble';
+    const bubble = new CSS2DObject(bubbleEl);
+    bubble.center.set(0.5, 1);
+    bubble.position.set(0, tagY + 0.28, 0);
+    bubble.visible = false;
+    let bubbleUntil = 0;
+
+    let model = null;
+    let look = null;
     let pos = null;
     let spot = null;
     let path = [];
     let pose = 'watch';
-    let mood = 'paused';
+    let moodKey = 'paused';
+
+    function paint() {
+      model.lamp.material.color.set(MOODS[moodKey].color);
+      model.bodyMat.color.copy(moodKey === 'offline' ? OFFLINE_BODY : model.baseColor);
+      model.eyeMat.color.set(moodKey === 'offline' ? '#3A404B' : '#9FE8FF');
+    }
 
     return {
-      color,
+      get color() { return look?.color; },
       get position() { return pos; },
+      setLook(next) {
+        if (look && look.color === next.color && look.gear === next.gear) return;
+        const old = model;
+        model = buildRobot(next.color, next.gear);
+        model.root.traverse((o) => { o.userData.robotId = id; });
+        model.hips.add(tag, bubble);
+        if (old) {
+          model.root.position.copy(old.root.position);
+          model.root.rotation.y = old.root.rotation.y;
+          scene.remove(old.root);
+          disposeTree(old.root);
+        }
+        scene.add(model.root);
+        look = next;
+        paint();
+      },
       setTarget(next, nextPose) {
         pose = nextPose;
         if (!pos) {
           pos = new THREE.Vector3(next.x, 0, next.z);
+          model.root.position.set(next.x, next.y, next.z);
           model.root.rotation.y = next.facing;
           spot = next;
           return;
@@ -637,32 +891,38 @@ export function createOfficeScene(container, { onSelect }) {
           spot = next;
           return;
         }
-        const start = path.length || !spot ? { x: pos.x, z: pos.z } : spot.approach;
+        const walking = path.length > 0;
+        const start = walking || !spot ? { x: pos.x, z: pos.z } : spot.approach;
         path = [
-          ...(path.length || !spot ? [] : [spot.approach]),
-          { x: CORRIDOR_X, z: start.z },
-          { x: CORRIDOR_X, z: next.approach.z },
+          ...(walking || !spot ? [] : [spot.approach]),
+          // Changing aisles goes by the corridor between the lounge and the desks.
+          ...(Math.abs(start.z - next.approach.z) > 0.6
+            ? [{ x: CORRIDOR_X, z: start.z }, { x: CORRIDOR_X, z: next.approach.z }] : []),
           next.approach,
           { x: next.x, z: next.z },
         ];
         spot = next;
       },
-      setMood(nextMood, robot, isSelected) {
-        mood = nextMood;
-        const m = MOODS[mood];
-        model.lamp.material.color.set(m.lamp);
-        model.bodyMat.color.copy(mood === 'offline' ? new THREE.Color('#5A5F68') : model.baseColor);
-        model.eyeMat.color.set(mood === 'offline' ? '#3A404B' : '#9FE8FF');
+      setMood(mood, robot, lit) {
+        moodKey = mood.key;
+        paint();
         const s = robot.status || {};
-        const inTrade = (s.positions || []).length > 0;
-        const label = mood === 'paused' && inTrade ? 'Paused · trade open' : m.label;
         const pnl = Number(s.day_pnl);
         const pnlHtml = Number.isFinite(pnl)
           ? `<span class="pnl ${pnl > 0 ? 'up' : pnl < 0 ? 'down' : ''}">${money(pnl, s.currency || 'USD', true)}</span>` : '';
-        tagEl.innerHTML = `<span class="dot" style="background:${m.lamp}"></span><b>${esc(robot.name)}</b><span class="st">${label}</span>${pnlHtml}`;
-        tagEl.classList.toggle('selected', isSelected);
+        tagEl.innerHTML = `<span class="dot" style="background:${MOODS[moodKey].color}"></span><b>${esc(robot.name)}</b><span class="st">${esc(mood.label)}</span>${pnlHtml}`;
+        tagEl.classList.toggle('selected', lit);
+      },
+      spotlight(lit) {
+        tagEl.classList.toggle('selected', lit);
+      },
+      say(text, tone = 'info') {
+        bubbleEl.innerHTML = `<span class="${esc(tone)}">${esc(text)}</span>`;
+        bubble.visible = true;
+        bubbleUntil = performance.now() + BUBBLE_MS;
       },
       step(dt, t) {
+        if (bubble.visible && performance.now() > bubbleUntil) bubble.visible = false;
         if (!pos) return;
         let current = pose;
         let y = spot ? spot.y : 0;
@@ -688,23 +948,26 @@ export function createOfficeScene(container, { onSelect }) {
         model.root.position.set(pos.x, y, pos.z);
         model.root.rotation.y = lerpAngle(model.root.rotation.y, facing, Math.min(1, dt * 10));
         applyPose(model, current, t);
-        if (mood === 'offline') model.lamp.visible = Math.sin(t * 5) > -0.2;
-        else model.lamp.visible = true;
+        const blinking = moodKey === 'offline' || moodKey === 'blocked';
+        model.lamp.visible = !blinking || Math.sin(t * 5) > -0.2;
       },
       dispose() {
         scene.remove(model.root);
+        disposeTree(model.root);
         tagEl.remove();
+        bubbleEl.remove();
       },
     };
   }
 
-  function update({ robots, selected }) {
+  function update({ robots, selected, history, latest }) {
     const now = Date.now();
     selectedId = selected ?? null;
     const sorted = [...robots].sort((a, b) => a.name.localeCompare(b.name)).slice(0, DESK_SLOTS.length);
+    order = sorted.map((r) => r.id);
 
     for (const [id, actor] of actors) {
-      if (!sorted.some((r) => r.id === id)) {
+      if (!order.includes(id)) {
         actor.dispose();
         actors.delete(id);
       }
@@ -713,27 +976,26 @@ export function createOfficeScene(container, { onSelect }) {
     const deskCount = Math.min(DESK_SLOTS.length, Math.max(4, sorted.length));
     desks.forEach((desk, i) => desk.setVisible(i < deskCount));
 
+    const moods = sorted.map((robot) => moodOf(robot, now));
     sorted.forEach((robot, i) => {
       let actor = actors.get(robot.id);
       if (!actor) {
-        actor = createActor(robot, ROBOT_COLORS[i % ROBOT_COLORS.length], i);
+        actor = createActor(robot.id, i);
         actors.set(robot.id, actor);
       }
-      const mood = moodOf(robot, now);
-      const inTrade = (robot.status?.positions || []).length > 0;
-      const inLounge = (mood === 'paused' || mood === 'done') && !inTrade;
-      const target = inLounge ? loungeSpot(LOUNGE_SEATS[i % LOUNGE_SEATS.length]) : deskSpot(DESK_SLOTS[i]);
-      const pose = inLounge ? 'rest' : mood === 'offline' ? 'sleep' : inTrade ? 'type' : 'watch';
-      actor.setTarget(target, pose);
-      actor.setMood(mood, robot, robot.id === selectedId);
-      desks[i].assign(robot, actor.color, mood);
+      const look = lookOf(robot, i);
+      actor.setLook(look);
+      const place = placeFor(moods[i], i);
+      actor.setTarget(place.spot, place.pose);
+      actor.setMood(moods[i], robot, robot.id === spotlightId());
+      desks[i].assign(robot, look.color, moods[i], history?.(robot.id));
     });
     for (let i = sorted.length; i < desks.length; i++) desks[i].assign(null);
 
-    drawWall(room.wall, sorted, now);
+    drawWall(room.wall, sorted, moods, history, latest);
   }
 
-  function drawWall(tex, robots, now) {
+  function drawWall(tex, robots, moods, history, latest) {
     const { ctx, canvas } = tex;
     const W = canvas.width;
     const H = canvas.height;
@@ -741,46 +1003,163 @@ export function createOfficeScene(container, { onSelect }) {
     ctx.fillRect(0, 0, W, H);
     const currency = robots.find((r) => r.status?.currency)?.status.currency || 'USD';
     const total = robots.reduce((sum, r) => sum + (Number(r.status?.day_pnl) || 0), 0);
-    const moods = robots.map((r) => moodOf(r, now));
     ctx.textAlign = 'left';
     ctx.fillStyle = GOLD;
     ctx.font = font(34, 700);
-    ctx.fillText('TRADING OFFICE · TODAY', 40, 66);
-    ctx.fillStyle = total > 0 ? GREEN : total < 0 ? RED : '#EDEBE6';
-    ctx.font = font(132, 700);
-    ctx.fillText(money(total, currency, true), 40, 220);
-    ctx.fillStyle = '#8F96A2';
+    ctx.fillText('TRADING OFFICE · TODAY', 40, 62);
+    ctx.fillStyle = toneColor(total);
+    ctx.font = font(124, 700);
+    ctx.fillText(money(total, currency, true), 40, 192);
+    ctx.fillStyle = MUTED;
     ctx.font = font(30, 400);
-    const online = moods.filter((m) => m !== 'offline').length;
-    const trading = moods.filter((m) => m === 'trade').length;
-    ctx.fillText(`${robots.length} robots · ${online} online · ${trading} in a trade`, 40, 280);
+    const online = moods.filter((m) => m.key !== 'offline').length;
+    const trading = moods.filter((m) => m.key !== 'offline' && m.inTrade).length;
+    ctx.fillText(`${robots.length} robot${robots.length === 1 ? '' : 's'} · ${online} online · ${trading} in a trade`, 40, 246);
+
+    // The last 7 days, from the trades the robots reported.
+    const weeks = robots.map((r) => history?.(r.id)).filter(Boolean);
+    const weekTrades = weeks.reduce((sum, w) => sum + w.trades.length, 0);
+    const weekTotal = weeks.reduce((sum, w) => sum + w.total, 0);
+    const weekWins = weeks.reduce((sum, w) => sum + w.wins, 0);
+    runs(ctx, 40, 304, weekTrades
+      ? [['Last 7 days  ', MUTED, font(30, 400)], [money(weekTotal, currency, true), toneColor(weekTotal), font(30, 700)],
+        [`  ·  ${weekTrades} trade${weekTrades === 1 ? '' : 's'} · ${weekWins} won`, MUTED, font(30, 400)]]
+      : [['Last 7 days  ', MUTED, font(30, 400)], ['no closed trades yet', MUTED, font(30, 400)]]);
+
     ctx.textAlign = 'right';
-    ctx.fillText(`Prague ${new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' })}`, W - 40, 66);
+    ctx.fillStyle = MUTED;
+    ctx.font = font(30, 400);
+    ctx.fillText(`Prague ${pragueClock()}`, W - 40, 62);
 
     // One row per robot on the right.
-    ctx.textAlign = 'left';
-    robots.slice(0, 5).forEach((r, i) => {
-      const y = 130 + i * 58;
-      const m = MOODS[moods[i]];
-      ctx.fillStyle = m.lamp;
+    robots.slice(0, 4).forEach((r, i) => {
+      const y = 124 + i * 56;
+      const mood = moods[i];
+      ctx.fillStyle = MOODS[mood.key].color;
       ctx.beginPath();
       ctx.arc(770, y - 10, 10, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#EDEBE6';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = INK;
       ctx.font = font(32, 700);
-      ctx.fillText(fitText(ctx, r.name, 220), 792, y);
-      ctx.fillStyle = '#8F96A2';
+      ctx.fillText(fitText(ctx, r.name, 210), 792, y);
+      ctx.fillStyle = MUTED;
       ctx.font = font(26, 400);
-      ctx.fillText(m.label, 1020, y);
+      ctx.fillText(fitText(ctx, mood.label, 190), 1012, y);
       const pnl = Number(r.status?.day_pnl) || 0;
       ctx.textAlign = 'right';
-      ctx.fillStyle = pnl > 0 ? GREEN : pnl < 0 ? RED : '#EDEBE6';
+      ctx.fillStyle = toneColor(pnl);
       ctx.font = font(30, 700);
       ctx.fillText(money(pnl, r.status?.currency || currency, true), W - 40, y);
-      ctx.textAlign = 'left';
     });
+    if (robots.length > 4) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = MUTED;
+      ctx.font = font(24, 400);
+      ctx.fillText(`+${robots.length - 4} more`, 792, 124 + 4 * 56);
+    }
+
+    // The latest thing any robot did, along the bottom.
+    ctx.fillStyle = '#10141A';
+    ctx.fillRect(0, 368, W, H - 368);
+    if (latest) {
+      const x = runs(ctx, 40, 418, [
+        ['LATEST  ', GOLD, font(26, 700)],
+        [`${pragueClock(new Date(latest.at))}  `, MUTED, font(28, 400)],
+        [`${latest.name}  `, INK, font(28, 700)],
+      ]);
+      ctx.fillStyle = MUTED;
+      ctx.font = font(28, 400);
+      ctx.fillText(fitText(ctx, latest.message, W - 40 - x), x, 418);
+    }
     tex.texture.needsUpdate = true;
   }
+
+  // ---------------------------------------------------------------------------
+  // Camera: follow a robot, the tour, and back to the whole office
+  // ---------------------------------------------------------------------------
+
+  const goal = new THREE.Vector3();
+  const right = new THREE.Vector3();
+  const up = new THREE.Vector3();
+
+  // Keeps a followed robot in the part of the view the robot's card doesn't cover.
+  function clearOfPanel(point) {
+    const inset = getInsets?.() || {};
+    const h = container.clientHeight;
+    if (!h || (!inset.right && !inset.bottom)) return;
+    const perPx = (camera.top - camera.bottom) / camera.zoom / h;
+    right.setFromMatrixColumn(camera.matrixWorld, 0);
+    up.setFromMatrixColumn(camera.matrixWorld, 1);
+    point.addScaledVector(right, ((inset.right || 0) / 2) * perPx).addScaledVector(up, -((inset.bottom || 0) / 2) * perPx);
+  }
+
+  function glide(dt) {
+    if (!cam) return;
+    if (cam.follow) {
+      const actor = actors.get(cam.follow);
+      if (!actor?.position) {
+        cam = null;
+        return;
+      }
+      goal.set(actor.position.x, 1.0, actor.position.z);
+      clearOfPanel(goal);
+    } else {
+      goal.copy(cam.target);
+    }
+    const k = 1 - Math.exp(-dt * 3.2);
+    const offset = camera.position.clone().sub(controls.target);
+    if (cam.offset) offset.lerp(cam.offset, k);
+    controls.target.lerp(goal, k);
+    camera.position.copy(controls.target).add(offset);
+    camera.zoom += (cam.zoom - camera.zoom) * k;
+    camera.updateProjectionMatrix();
+    if (!cam.follow && controls.target.distanceTo(goal) < 0.01 && Math.abs(camera.zoom - cam.zoom) < 0.003
+      && (!cam.offset || offset.distanceTo(cam.offset) < 0.02)) cam = null;
+  }
+
+  function refreshSpotlight() {
+    for (const [id, actor] of actors) actor.spotlight(id === spotlightId());
+  }
+
+  function focus(id) {
+    endTour();
+    cam = { follow: id, zoom: Math.max(camera.zoom, 1.6) };
+  }
+
+  function home() {
+    cam = { target: HOME.target.clone(), offset: HOME.offset.clone(), zoom: HOME.zoom };
+  }
+
+  function startTour() {
+    endTour();
+    let stop = -1;
+    const next = () => {
+      stop = (stop + 1) % (order.length + 1);
+      tourId = order[stop] ?? null; // the last stop is the whole office
+      if (tourId) cam = { follow: tourId, zoom: 1.9 };
+      else home();
+      refreshSpotlight();
+    };
+    next();
+    tourTimer = setInterval(next, TOUR_STOP_MS);
+    onTour?.(true);
+  }
+
+  function endTour() {
+    if (!tourTimer) return;
+    clearInterval(tourTimer);
+    tourTimer = null;
+    tourId = null;
+    refreshSpotlight();
+    onTour?.(false);
+  }
+
+  // Dragging or zooming by hand takes the camera back.
+  controls.addEventListener('start', () => {
+    cam = null;
+    endTour();
+  });
 
   // Clicking a robot (not dragging the view) selects it.
   const raycaster = new THREE.Raycaster();
@@ -821,10 +1200,11 @@ export function createOfficeScene(container, { onSelect }) {
     const dt = Math.min(clock.getDelta(), 0.25);
     const t = clock.elapsedTime;
     for (const actor of actors.values()) actor.step(dt, t);
-    const selected = selectedId && actors.get(selectedId);
-    ring.visible = !!(selected && selected.position);
+    glide(dt);
+    const lit = spotlightId() && actors.get(spotlightId());
+    ring.visible = !!(lit && lit.position);
     if (ring.visible) {
-      ring.position.set(selected.position.x, 0.03, selected.position.z);
+      ring.position.set(lit.position.x, 0.03, lit.position.z);
       ring.rotation.z = t * 0.8;
     }
     room.blink(t);
@@ -835,6 +1215,19 @@ export function createOfficeScene(container, { onSelect }) {
 
   return {
     update,
+    say(id, text, tone) {
+      actors.get(id)?.say(text, tone);
+    },
+    focus,
+    home,
+    tour(on) {
+      if (on) {
+        startTour();
+      } else {
+        endTour();
+        home();
+      }
+    },
     setActive(on) {
       if (on === running) return;
       running = on;
@@ -842,11 +1235,14 @@ export function createOfficeScene(container, { onSelect }) {
       if (on) {
         resize();
         clock.getDelta();
+      } else {
+        endTour();
       }
       renderer.setAnimationLoop(on ? tick : null);
     },
     dispose() {
       renderer.setAnimationLoop(null);
+      endTour();
       clearInterval(clockTimer);
       observer.disconnect();
       renderer.dispose();

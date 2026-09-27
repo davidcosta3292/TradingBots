@@ -10,6 +10,8 @@
   --green: #3ddc84;
   --red: #f06a5f;
   --blue: #83a6f4;
+  --lavender: #a58bf2;
+  --orange: #f08a4b;
   --head: Bahnschrift, "Segoe UI", system-ui, sans-serif;
   --body: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: dark;
@@ -162,6 +164,11 @@ main { max-width: 1120px; margin: 0 auto; padding: 16px; }
 .pill.active { background: rgba(131, 166, 244, 0.15); color: var(--blue); }
 .pill.paused { background: rgba(227, 168, 43, 0.15); color: var(--gold); }
 .pill.offline { background: rgba(240, 106, 95, 0.15); color: var(--red); }
+.pill.standby { background: rgba(165, 139, 242, 0.15); color: var(--lavender); }
+.pill.blocked { background: rgba(240, 138, 75, 0.15); color: var(--orange); }
+.pill.done { background: rgba(144, 151, 163, 0.15); color: #c9cdd5; }
+.robot.standby { border-color: rgba(165, 139, 242, 0.4); }
+.robot.blocked { border-color: rgba(240, 138, 75, 0.5); }
 
 .position, .flat {
   margin: 0;
@@ -202,6 +209,12 @@ main { max-width: 1120px; margin: 0 auto; padding: 16px; }
 }
 .blocks span { color: var(--gold); font-size: 12px; }
 .blocks ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink); }
+.blocks .resume { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; }
+.robot.standby .blocks { border-left-color: var(--lavender); background: rgba(165, 139, 242, 0.07); }
+.robot.standby .blocks span { color: var(--lavender); }
+.blocks.needs-you { border-left-color: var(--orange); background: rgba(240, 138, 75, 0.08); }
+.blocks.needs-you span { color: var(--orange); }
+.blocks.needs-you .resume { color: var(--ink); }
 
 .warn { margin: 0; color: var(--red); font-size: 13px; }
 .viewonly, .hint { margin: 0; color: var(--faint); font-size: 12.5px; }
@@ -383,6 +396,142 @@ body[data-view="cards"] #scene-view { display: none; }
   background: var(--panel-2);
   color: var(--muted);
   cursor: pointer;
+}
+
+/* Trade history in each card */
+.history { display: grid; gap: 6px; }
+.history-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.history-top b { font-family: var(--head); font-size: 15px; font-variant-numeric: tabular-nums; }
+.spark { display: block; width: 100%; height: 54px; background: var(--panel-2); border-radius: 10px; }
+.spark .zero { stroke: var(--line); stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.trades { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 12.5px; }
+.trades li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: baseline; color: var(--muted); }
+.trades time { color: var(--faint); font-variant-numeric: tabular-nums; }
+.trades > li > b { font-family: var(--head); font-variant-numeric: tabular-nums; }
+
+/* A robot's look, for its owner */
+.look { border-top: 1px solid var(--line); padding-top: 10px; }
+.look-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.look-toggle:hover { color: var(--ink); }
+.look-toggle .chev { margin-left: auto; }
+.swatch-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.look-body { display: grid; gap: 10px; margin-top: 10px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.swatch.on { border-color: var(--ink); }
+.gear { display: flex; flex-wrap: wrap; gap: 6px; }
+.gear button {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font: 600 12px var(--body);
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.gear button.on { color: var(--gold); border-color: rgba(227, 168, 43, 0.6); }
+
+/* Office tools, the sound switch and the legend */
+.scene-tools { position: absolute; top: 12px; left: 12px; z-index: 2; display: flex; gap: 6px; }
+.scene-tools button, .summary .chip {
+  background: rgba(22, 25, 32, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font: 600 12.5px var(--body);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.scene-tools button:hover, .summary .chip:hover { color: var(--ink); border-color: #3a404b; }
+.scene-tools button.on, .summary .chip.on { color: var(--gold); border-color: rgba(227, 168, 43, 0.6); }
+.summary .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; align-self: center; }
+.summary .chip svg { width: 15px; height: 15px; }
+
+.legend {
+  position: absolute;
+  top: 54px;
+  left: 12px;
+  z-index: 2;
+  width: min(340px, calc(100% - 24px));
+  background: rgba(14, 16, 20, 0.95);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.legend h3 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font: 600 12px var(--head);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.legend ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.legend li { display: flex; gap: 9px; align-items: baseline; }
+.legend i { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.legend b { color: var(--ink); font-weight: 600; }
+
+/* Speech bubbles: what a robot just did */
+.bubble { pointer-events: none; }
+.bubble span {
+  position: relative;
+  display: block;
+  margin-bottom: 9px;
+  padding: 6px 11px;
+  border-radius: 12px;
+  background: #f4f1ea;
+  color: #15181d;
+  font: 600 12.5px var(--head);
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  animation: bubble 6s ease forwards;
+}
+.bubble span::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-bottom: 0;
+  border-top-color: #f4f1ea;
+}
+.bubble span.good { background: #d4f5e2; }
+.bubble span.good::after { border-top-color: #d4f5e2; }
+.bubble span.bad { background: #fcdcd7; }
+.bubble span.bad::after { border-top-color: #fcdcd7; }
+@keyframes bubble {
+  0% { opacity: 0; transform: translateY(6px) scale(0.85); }
+  6% { opacity: 1; transform: none; }
+  88% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @media (max-width: 760px) {

@@ -20,7 +20,7 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run the files in `supabase/migrations/` in order: `0001`, `0002`, then `0003`.
+2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0005`.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in, and create one robot each:
@@ -44,6 +44,13 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
    Paste the token when asked. The script finds your chat, sends a test message, and copies one line to your clipboard.
 4. Paste that line into the Supabase **SQL Editor** and press **Run**. You should get "Trading Office connected" in Telegram.
 
+From then on Telegram tells you, the moment it happens:
+- every button press the robot confirms or refuses, and who pressed it;
+- every trade a robot opens or closes, with the result;
+- a robot starting, stopping, hitting a limit stop, or reporting an error.
+
+Within a minute or two it also tells you when a robot goes offline or comes back, and when a button press wasn't confirmed.
+
 ### 3. Control page
 
 1. Copy `office/config.example.js` to `office/config.js`, and fill in the Project URL and publishable key.
@@ -51,6 +58,18 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 3. Sign in. To see it before anything is set up, open http://localhost:8765/?demo.
 
 The page has two views: **Office**, the 3D office, and **Cards**, the plain list that works best on a phone.
+
+In the office, where a robot is tells you what it's doing:
+
+| Where | What it means |
+|---|---|
+| At its desk | Working, looking for a setup. Typing when it's in a trade. |
+| At the coffee bar | Switched on, but its own rules say "not now": outside its hours, market closed, or news. It carries on by itself. |
+| At its desk, scratching its head | Blocked by something that needs you, like Algo Trading switched off in MetaTrader |
+| On the sofa | Paused, or done for today |
+| Asleep and grey | Offline: MetaTrader isn't reporting |
+
+Robots say what they just did in a speech bubble. The right-hand monitor on each desk takes turns between the FTMO limits and the last 7 days of trades. **Tour** flies the camera from robot to robot, **Legend** explains the places, and **Sound** turns on small sounds for trades and button presses. Each robot's owner can change its colour and gear under **Look in the office** in its card.
 
 ### 4. The robot (each of us, on our own PC and FTMO account)
 
