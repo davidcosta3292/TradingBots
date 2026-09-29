@@ -1,10 +1,12 @@
 # Trading Office
 
-One shared office for both members' robots. Each Trader EA uses its owner's FTMO MetaTrader 5 demo account; its owner can press Start, Pause, Done for today or Close everything. The office also has named planning slots for future risk, coordination, and analysis agents.
+One shared office for both members' robots. Each Trader EA uses its owner's FTMO MetaTrader 5 demo account; its owner can press Start, Pause, Done for today or Close everything. The Fundamental Analyst runs on Supabase and watches news. Risk manager and Coordinator are planning slots.
 
 ```
 MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live──  Control page (browser / phone)
    (each on our own PC)      ◄──commands──   (database)  ──alerts──►  Telegram
+Supabase Edge Function     ──news reports─►    ▲
+   (5-minute server schedule)
 ```
 
 | Folder | What's in it |
@@ -14,13 +16,14 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 | `supabase/migrations/` | The database. Run once in the Supabase SQL editor. |
 | `robot/` | The MetaTrader 5 robot, and a script that installs and compiles it |
 | `office/` | The control page |
+| `supabase/functions/fundamental-analyst/` | The scheduled, server-side news watcher |
 
 ## One-time setup
 
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0010`.
+2. **SQL Editor:** run migrations `0001` to `0010` in order. Migration `0011` schedules this project's Analyst function and requires its Vault token first; its URL and public key must be changed for another Supabase project.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in. An office member can create up to six slots from the hosted page; administrators can also use the helpers below:
@@ -61,7 +64,7 @@ Within a minute or two it also tells you when a robot goes offline or comes back
 
 #### Share the office on Vercel
 
-The office is a static website. Vercel serves only the `office/` folder; Supabase still handles sign-in, commands, and robot reports. MetaTrader and the EA continue running on the Windows PC. Publishing the website does not move or start the trading robot.
+The office is a static website. Vercel serves only the `office/` folder; Supabase handles sign-in, commands, robot reports, and the scheduled Fundamental Analyst. MetaTrader and the Trader EA still run on each owner's PC. Publishing the website does not move or start a Trader EA.
 
 1. Import this GitHub repository into Vercel and set **Root Directory** to `office`.
 2. Set **Framework Preset** to **Other**. There is no build command or environment variable to add; `office/config.js` contains only the public Supabase project URL and publishable key.
@@ -88,9 +91,9 @@ In the office, where a robot is tells you what it's doing:
 
 The Fundamental Analyst watches the Forex Factory calendar and public Investing.com, Bloomberg and WSJ/Dow Jones RSS feeds for USD releases and headlines relevant to XAUUSD. It is a separate, read-only program. It does not connect to MetaTrader, trade, or control the Trader EA. Its office card shows upcoming events, linked headlines and source health. Important observations can also reach the same Telegram bot's private chat and group, with a 30-minute alert limit. The Trader EA still uses its own MT5 news guard.
 
-David's **Fundamental Analyst** slot is already configured with a private local token. On the current Windows PC, run **`Start Fundamental Analyst.cmd`** in this repository and keep it open. The watcher reports every five minutes; its status becomes offline after 12 minutes without a report. Its token is in the ignored `news/config.json` file and must never be put in `office/config.js` or GitHub.
+David's **Fundamental Analyst** runs as a Supabase Edge Function called every five minutes by `pg_cron` and `pg_net`. Its token is encrypted in Supabase Vault, never in the Vercel website or GitHub. The old local process has been stopped. The office marks the Analyst offline after 12 minutes without a report and sends the usual Telegram offline alert. Turning off David's PC does not stop this Analyst.
 
-For another Analyst, use **+ Add robot → Fundamental Analyst** in the office, copy its one-time token, copy `news/config.example.json` to `news/config.json` on the PC that will run it, fill in the Supabase URL and publishable key, and run `node news/analyst.mjs`. Read [plan/news-agent.md](plan/news-agent.md) for its limits and source behavior.
+For another Analyst, use **+ Add robot → Fundamental Analyst** in the office and keep its one-time token private. That slot needs its own server schedule and Vault token before it reports; creating a slot alone does not activate a new server job. Read [plan/news-agent.md](plan/news-agent.md) for source behavior and limits.
 
 Robots say what they just did in a speech bubble. The right-hand monitor on each desk takes turns between the FTMO limits and the last 7 days of trades. **Tour** flies the camera from robot to robot, **Legend** explains the places, and **Sound** turns on small sounds for trades and button presses. Each robot's owner can change its colour and gear under **Look in the office** in its card.
 

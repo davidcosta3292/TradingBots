@@ -2,7 +2,7 @@
 
 ## Running now
 
-The **Fundamental Analyst** is a separate read-only program on David's PC. Every five minutes it reads the public Forex Factory weekly calendar export and RSS feeds from Investing.com, Bloomberg and the Wall Street Journal's Dow Jones feed. It records source, headline or USD event title, link and feed time in Supabase. It shows the next USD high/medium-impact events and recent gold-relevant headlines in the shared office. Source health is visible so a broken feed does not look like a quiet market.
+The **Fundamental Analyst** is a read-only Supabase Edge Function. A database cron job calls it every five minutes, even when David's PC is off. It reads the public Forex Factory weekly calendar export and RSS feeds from Investing.com, Bloomberg and the Wall Street Journal's Dow Jones feed. It records source, headline or USD event title, link and feed time in Supabase. It shows the next USD high/medium-impact events and recent gold-relevant headlines in the shared office. Source health is visible so a broken feed does not look like a quiet market.
 
 The matching is deterministic: headlines with words such as gold, XAU, Fed, CPI, PCE, payrolls and yields appear first. A match is **not** a forecast of price direction, a complete reading of the article, or a trade signal. No paywalled article body is fetched. Open the linked publication for context. Investing.com RSS omits an explicit time zone; the watcher interprets those feed times as UTC.
 
@@ -10,14 +10,14 @@ Supabase stores the items under `news_items` and deduplicates them. At most one 
 
 This Analyst has a separate token and a separate `analyst_sync` reporting function. It cannot call the Trader's reporting door, cannot press office trade controls, and never has access to MetaTrader, broker credentials or orders. The Trader EA still uses its own MT5 calendar news guard and its own strategy and FTMO protections. The Analyst currently **does not block or approve trades**.
 
-## Run on a PC
+## Server setup
 
-1. Create a **Fundamental Analyst** office slot, or use the one already created for David. Its token is shown once when created.
-2. Copy `news/config.example.json` to `news/config.json`. Fill in the Supabase URL, publishable key, and this Analyst's token. Keep `news/config.json` private; it is ignored by Git.
-3. On Windows, double-click `Start Fundamental Analyst.cmd`. On a Mac with Node.js installed, run `node news/analyst.mjs` from the repository directory. Keep the process running. It does not require MetaTrader or a trading account.
-4. Open the office card. **Scanning news** means it has reported within 12 minutes. A feed failure is listed beside that source. **Offline** means the watcher stopped reporting; the configured Telegram bot also announces it.
+1. The existing **Fundamental Analyst** office slot has a separate token. It is stored in Supabase Vault as `trading_analyst_token`; only a token hash is in `robot_secrets`.
+2. The Edge Function source is `supabase/functions/fundamental-analyst/index.ts`. It has custom token authentication before it fetches feeds, then reports through `analyst_sync`. It does not have a MetaTrader connection or trading permissions.
+3. Migration `0011_schedule_fundamental_analyst.sql` installs the five-minute `office-fundamental-analyst` cron job. It calls the function through `pg_net`, reading the token from Vault. The URL and publishable key in that migration belong to the TradingBots project and must be changed for another project.
+4. In the office card, **Scanning news** means the job has reported within 12 minutes. A feed failure is listed beside that source. **Offline** means reports stopped; the configured Telegram bot also announces it. Cron run details and `net._http_response` show scheduling and HTTP failures.
 
-David's first scan was connected to the existing office on 29 September 2026. The watcher runs on his current Windows PC. If the PC sleeps, shuts down or loses internet, scans stop. The Vercel office website and Supabase database alone do not run the watcher.
+The local PC watcher was retired after the server version reported successfully on 29 September 2026. Vercel still only hosts the office page. Supabase now runs the Analyst. The Trader EA still depends on its owner's MetaTrader PC until moved to a VPS or supported server.
 
 ## Later
 

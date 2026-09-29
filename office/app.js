@@ -5,7 +5,7 @@
 // sample robots, no Supabase needed.
 import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=11';
 import { COLORS, EYES, GEAR, lookOf } from './looks.js?v=8';
-import { ASSIGNMENTS, assignmentOf, isTrader, isAnalyst } from './assignments.js?v=11';
+import { ASSIGNMENTS, assignmentOf, isTrader, isAnalyst } from './assignments.js?v=12';
 import { play, setSound, soundOn } from './sounds.js?v=5';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -182,7 +182,7 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=11')
+  officeLoading ??= import('./scene.js?v=12')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
@@ -380,7 +380,7 @@ async function onClick(event) {
     try {
       await navigator.clipboard.writeText(newRobotToken.token);
       return toast(newRobotToken.assignment === 'analyst'
-        ? 'Analyst token copied. Save it in news/config.json on your PC.'
+        ? 'Analyst token copied. Keep it private for its server schedule.'
         : 'Robot token copied. Paste it into your own MetaTrader robot settings.');
     } catch {
       return toast('Select the token and copy it manually.');
@@ -548,9 +548,9 @@ function renderSetup(robots) {
     setup.innerHTML = `<h2>${esc(newRobotToken.name)} · ${esc(assignmentOf(newRobotToken).label)}</h2>
       ${trader ? `<p>This token is shown only now. Copy it into the <b>Robot token</b> input of OfficeRobot on your own MetaTrader 5 account.</p>
       <div class="token-line"><code>${esc(newRobotToken.token)}</code><button type="button" data-copy-robot-token>Copy token</button></div>`
-      : analyst ? `<p>This token is shown only now. Copy it into <code>news/config.json</code> on the PC that will run the news watcher. This robot does not connect to MetaTrader or trade.</p>
+      : analyst ? `<p>This token is shown only now. It is used to configure a separate Supabase server schedule for this Analyst. Creating the slot alone does not start another server job. This robot does not connect to MetaTrader or trade.</p>
       <div class="token-line"><code>${esc(newRobotToken.token)}</code><button type="button" data-copy-robot-token>Copy token</button></div>
-      <p>Copy <code>news/config.example.json</code> to <code>news/config.json</code>, fill in the Supabase URL, publishable key and this token, then run <code>Start Fundamental Analyst.cmd</code> (Windows) or <code>node news/analyst.mjs</code> (Mac). Keep that program running for live news updates.</p>`
+      <p>Keep this token private. The existing Fundamental Analyst already has its own server schedule; a new Analyst needs another schedule before it can report.</p>`
       : '<p>This role is an office assignment only. Its software has not been built yet. The MetaTrader trading EA must not be attached to it.</p>'}
       ${trader ? `
       <p><a href="downloads/OfficeRobot-source.zip" download>Download OfficeRobot source</a>. On Mac: in MetaTrader, open <b>File → Open Data Folder</b>, then copy the unzipped <code>OfficeRobot</code> folder into <code>MQL5/Experts</code>. Open <code>OfficeRobot.mq5</code> in MetaEditor and compile it with F7.</p>
@@ -569,7 +569,7 @@ function renderSetup(robots) {
   setup.hidden = false;
   setup.innerHTML = `<button type="button" class="add-robot" data-add-robot aria-expanded="${setupOpen}">
     ${setupOpen ? '− Close' : '+ Add robot'} <small>${mine}/6 yours</small></button>
-    ${setupOpen ? `<p>Trader runs in MetaTrader. Fundamental Analyst watches news on a PC. Risk manager and Coordinator are planning slots.</p>
+    ${setupOpen ? `<p>Trader runs in MetaTrader. The existing Fundamental Analyst runs on Supabase; a new Analyst needs its own server schedule. Risk manager and Coordinator are planning slots.</p>
       <form><label>Name <input name="name" maxlength="40" placeholder="e.g. Gold Trader" required></label>
       <label>Assignment <select name="assignment">${ASSIGNMENTS.map((a) => `<option value="${a.key}">${a.label} · ${a.detail}</option>`).join('')}</select></label>
       <button type="submit">Create robot</button></form>
@@ -698,7 +698,7 @@ function analystCard(r, mood, owner, mine) {
       <p class="sub">${esc(owner)}${mine ? ' · yours' : ' · view only'} · Fundamental Analyst · XAUUSD</p></div>
       <span class="pill ${mood.key}">${esc(mood.label)}</span></header>
     <p class="seen">${seenText(r, mood.key !== 'offline' && mood.key !== 'planned')}</p>
-    <p class="flat">Checks economic headlines and upcoming USD releases. Reports observations to the office and Telegram. It cannot trade or control Trader robots.</p>
+    <p class="flat">${r.last_report_at ? 'Supabase checks economic headlines and upcoming USD releases every five minutes.' : 'Waiting for a server schedule.'} Reports observations to the office and Telegram. It cannot trade or control Trader robots.</p>
     ${r.last_report_at ? `<div class="news-health"><b>Sources ${esc(s.healthy_feeds ?? 0)}/${esc(s.total_feeds ?? 5)} online</b>
       <small>Last scan ${s.checked_at ? esc(ago(s.checked_at)) : 'unknown'}</small>
       <div>${feeds.map((f) => `<span class="source-chip ${f.ok ? 'ok' : 'bad'}" title="${esc(f.error || f.feed || '')}">${esc(f.source)} ${f.ok ? '✓' : '!'}</span>`).join('')}</div></div>` : ''}
@@ -828,7 +828,7 @@ function lookPicker(r) {
 
 function seenText(r, online) {
   if (!r.last_report_at) return r.assignment === 'analyst'
-    ? 'Never connected yet. Start the news watcher on its PC.'
+    ? 'Never connected yet. A server schedule must be configured for this slot.'
     : 'Never connected yet. Start the robot in MetaTrader.';
   return online ? `Online · reported ${ago(r.last_report_at)}` : `Offline · last report ${ago(r.last_report_at)}`;
 }

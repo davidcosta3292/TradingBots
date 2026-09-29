@@ -3,7 +3,7 @@ export const ASSIGNMENTS = [
   { key: 'trader', label: 'Trader', detail: 'MetaTrader EA · strategy and FTMO guards' },
   { key: 'risk_manager', label: 'Risk manager', detail: 'Planned · portfolio-level risk review' },
   { key: 'coordinator', label: 'Coordinator', detail: 'Planned · supervise sessions and assignments' },
-  { key: 'analyst', label: 'Fundamental Analyst', detail: 'News and USD calendar · no trading access' },
+  { key: 'analyst', label: 'Fundamental Analyst', detail: 'Server news watch · each slot needs scheduling' },
 ];
 export const assignmentOf = (robot) => ASSIGNMENTS.find((a) => a.key === robot.assignment) || ASSIGNMENTS[0];
 export const isTrader = (robot) => assignmentOf(robot).key === 'trader';

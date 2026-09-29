@@ -8,7 +8,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { MOODS, moodOf } from './moods.js?v=11';
 import { lookOf } from './looks.js?v=8';
-import { assignmentOf } from './assignments.js?v=11';
+import { assignmentOf } from './assignments.js?v=12';
 
 const ROOM = { w: 25, d: 18, h: 4.6 };
 const CORRIDOR_X = -2.8;
@@ -423,7 +423,7 @@ function buildDesk(scene, slot) {
       ctx.fillStyle = MUTED;
       ctx.font = font(25, 400);
       ctx.fillText(fitText(ctx, robot.assignment === 'analyst'
-        ? 'Start the news watcher on its PC' : assignmentOf(robot).label + ' · no runtime yet', W - 42), W / 2, 240);
+        ? 'Server schedule needed' : assignmentOf(robot).label + ' · no runtime yet', W - 42), W / 2, 240);
     } else if (mood.key === 'offline') {
       ctx.fillStyle = RED;
       ctx.font = font(64, 700);
