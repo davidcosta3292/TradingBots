@@ -3,6 +3,7 @@ Connects the Trading Office alerts to Telegram. Run it yourself (it asks for
 your bot token, which stays on this PC):
 
     powershell -ExecutionPolicy Bypass -File .\tools\telegram-setup.ps1
+    powershell -ExecutionPolicy Bypass -File .\tools\telegram-setup.ps1 -Group
 
 Before running it:
   1. In Telegram, open @BotFather, send /newbot, choose a name, then a username
@@ -10,6 +11,7 @@ Before running it:
   2. Tap the link to your new bot and press Start. For alerts in a group with
      your friend, add the bot to the group and send a message there instead.
 #>
+param([switch]$Group)
 $ErrorActionPreference = 'Stop'
 
 $secure = Read-Host 'Paste the bot token from BotFather' -AsSecureString
@@ -47,6 +49,10 @@ for ($i = 0; $i -lt $list.Count; $i++) {
 $pick = 0
 if ($list.Count -gt 1) { $pick = [int](Read-Host 'Which chat should get the alerts? Type its number') - 1 }
 $chat = $list[$pick]
+if ($Group -and $chat.type -notin @('group', 'supergroup')) {
+    Write-Host 'Choose a group or supergroup when using -Group.'
+    exit 1
+}
 
 Invoke-RestMethod "$api/sendMessage" -Method Post -Body @{
     chat_id = $chat.id
@@ -54,9 +60,16 @@ Invoke-RestMethod "$api/sendMessage" -Method Post -Body @{
 } | Out-Null
 Write-Host 'Sent a test message. Check Telegram.'
 
-$sql = "select public.set_telegram('$token', '$($chat.id)'); select public.telegram('Trading Office connected');"
+$sql = if ($Group) {
+    "update public.office_settings set telegram_group_chat_id = '$($chat.id)' where id;"
+} else {
+    "select public.set_telegram('$token', '$($chat.id)'); select public.telegram('Trading Office connected');"
+}
 Set-Clipboard -Value $sql
 Write-Host ''
 Write-Host 'Last step: the line below is on your clipboard. Paste it into the Supabase SQL Editor and press Run.'
-Write-Host ''
-Write-Host "  $sql"
+if ($Group) {
+    Write-Host "Group chat ID $($chat.id) will be added alongside the existing private chat."
+} else {
+    Write-Host 'The clipboard includes your bot token. Do not paste it into chat or GitHub.'
+}

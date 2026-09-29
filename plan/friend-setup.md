@@ -18,14 +18,13 @@ The current strategy is a **demo execution exercise**: EMA 5/13 direction on a c
 
 ## Telegram
 
-The current Telegram bot is **@Trader1DBot**. Alerts are sent centrally by Supabase to **one configured chat**. Creating an office robot does not connect a new Telegram chat.
+The current Telegram bot is **@Trader1DBot**. Alerts are sent centrally by Supabase to David's private chat and the **TraderMindz** group. Creating an office robot does not connect a new Telegram chat.
 
 To receive the same alerts as David:
 
-1. Create a private Telegram group with you and David, and add **@Trader1DBot**.
-2. Send `/start@Trader1DBot` in the group so the bot receives an update.
-3. Ask David to run `tools/telegram-setup.ps1` on his Windows PC and choose the group when it appears. The helper sends a test message and copies the Supabase command to the clipboard; it does **not** save the setting by itself. David can ask Codex to apply that command through the Supabase connector, or run it in the Supabase SQL Editor.
-4. Confirm that both of you see the test message and a subsequent robot event. Until the group is configured, alerts still go to the existing private chat. The office shows command confirmations and events to both members independently of Telegram.
+1. Join the **TraderMindz** Telegram group. The bot is already a member.
+2. Confirm that you can see the Trading Office connection test there. Future alerts from both connected Trader EAs appear in this group and in David's private chat.
+3. If the group changes later, add **@Trader1DBot** to the new group, send `/start@Trader1DBot`, and run `tools/telegram-setup.ps1 -Group` to copy the new group setting. This keeps the private chat in place. The office shows command confirmations and events to both members independently of Telegram.
 
 ## Assignments
 

@@ -20,7 +20,7 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0008`.
+2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0009`.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in. An office member can create up to six slots from the hosted page; administrators can also use the helpers below:
@@ -36,13 +36,15 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 2. Phone alerts (optional, 5 minutes)
 
 1. In Telegram, search for **@BotFather**, send `/newbot`, and pick a name, then a username ending in `bot`. BotFather replies with a token.
-2. Tap the link to your new bot and press **Start**. For alerts in a group with both of us, add the bot to the group and send a message there instead.
+2. Tap the link to your new bot and press **Start**.
 3. In PowerShell, in the repo folder, run:
    ```
    powershell -ExecutionPolicy Bypass -File .\tools\telegram-setup.ps1
    ```
    Paste the token when asked. The script finds your chat, sends a test message, and copies one line to your clipboard.
 4. Paste that line into the Supabase **SQL Editor** and press **Run**. You should get "Trading Office connected" in Telegram.
+
+To add a group **as well as** the private chat, add the same bot to the group and send `/start@YourBotName` there. Run `tools/telegram-setup.ps1 -Group`, choose the group, and run the copied SQL in the Supabase SQL Editor. The group ID is stored in `office_settings.telegram_group_chat_id`; the private chat remains in `telegram_chat_id`. The TradingBots project already has **TraderMindz** configured and a test message was delivered to both chats.
 
 From then on Telegram tells you, the moment it happens:
 - every button press the robot confirms or refuses, and who pressed it;
