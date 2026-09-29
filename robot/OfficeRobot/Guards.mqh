@@ -46,6 +46,8 @@ private:
 
    // Rebuild closed-position outcomes from broker history, including entry
    // commission. Partial exits only count after the position is fully closed.
+   // The retired three-minute exercise has a distinct entry comment and must
+   // not become this plan's losing streak on the day we change strategies.
    void              RefreshLosses(void)
      {
       datetime now=TimeTradeServer();
@@ -54,12 +56,14 @@ private:
       m_lossCheckedAt=now;
       m_lastLossAt=0;
       m_lossStreak=0;
-      m_lossHistoryOk=HistorySelect(ClockPragueDayStartServer(),now+60);
+      datetime dayStart=ClockPragueDayStartServer();
+      m_lossHistoryOk=HistorySelect(dayStart-7*86400,now+60);
       if(!m_lossHistoryOk)
          return;
       long ids[];
       double net[];
       datetime closedAt[];
+      bool exercise[];
       int n=0;
       int total=HistoryDealsTotal();
       for(int i=0;i<total;i++)
@@ -88,10 +92,15 @@ private:
             ArrayResize(ids,n);
             ArrayResize(net,n);
             ArrayResize(closedAt,n);
+            ArrayResize(exercise,n);
             ids[found]=id;
             net[found]=0;
             closedAt[found]=0;
+            exercise[found]=false;
            }
+         if(entry==DEAL_ENTRY_IN
+            && StringFind(HistoryDealGetString(ticket,DEAL_COMMENT),"demo exercise ")==0)
+            exercise[found]=true;
          net[found]+=HistoryDealGetDouble(ticket,DEAL_PROFIT)
                      +HistoryDealGetDouble(ticket,DEAL_COMMISSION)
                      +HistoryDealGetDouble(ticket,DEAL_SWAP)
@@ -103,7 +112,7 @@ private:
       double latestNet=0,previousNet=0;
       for(int i=0;i<n;i++)
         {
-         if(closedAt[i]==0)
+         if(closedAt[i]<dayStart || exercise[i])
             continue;
          bool stillOpen=false;
          for(int p=PositionsTotal()-1;p>=0;p--)
@@ -177,7 +186,8 @@ private:
               +HistoryDealGetDouble(ticket,DEAL_SWAP)+HistoryDealGetDouble(ticket,DEAL_FEE);
          if(HistoryDealGetInteger(ticket,DEAL_MAGIC)==m_magic
             && HistoryDealGetString(ticket,DEAL_SYMBOL)==m_symbol
-            && HistoryDealGetInteger(ticket,DEAL_ENTRY)==DEAL_ENTRY_IN)
+            && HistoryDealGetInteger(ticket,DEAL_ENTRY)==DEAL_ENTRY_IN
+            && StringFind(HistoryDealGetString(ticket,DEAL_COMMENT),"demo exercise ")!=0)
             entries++;
         }
       return sum;

@@ -9,7 +9,7 @@
 //|    Start in the office.                                          |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "1.20"
+#property version     "1.21"
 #property description "Trading Office robot: XAUUSD plan draft, demo only, FTMO guards, office controls."
 
 #include "Clock.mqh"
@@ -19,7 +19,7 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.2.0"
+#define ROBOT_VERSION "1.2.1"
 // Our office. Used whenever the URL or key input is left empty.
 #define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
 #define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
@@ -752,7 +752,8 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &
    long entry=HistoryDealGetInteger(trans.deal,DEAL_ENTRY);
    if(entry==DEAL_ENTRY_IN)
      {
-      g_guards.AddTrade();
+      if(StringFind(HistoryDealGetString(trans.deal,DEAL_COMMENT),"demo exercise ")!=0)
+         g_guards.AddTrade();
       int digits=(int)SymbolInfoInteger(_Symbol,SYMBOL_DIGITS);
       string side=HistoryDealGetInteger(trans.deal,DEAL_TYPE)==DEAL_TYPE_BUY ? "BUY" : "SELL";
       Event("trade",StringFormat("Opened %s %s lots %s at %s (broker fill)",
