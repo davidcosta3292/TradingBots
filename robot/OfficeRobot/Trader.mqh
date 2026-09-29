@@ -46,6 +46,33 @@ public:
       return 0;
      }
 
+   bool              HasPending(void)
+     {
+      for(int i=OrdersTotal()-1;i>=0;i--)
+        {
+         ulong ticket=OrderGetTicket(i);
+         if(ticket>0 && OrderGetInteger(ORDER_MAGIC)==m_magic
+            && OrderGetString(ORDER_SYMBOL)==m_symbol)
+            return true;
+        }
+      return false;
+     }
+
+   datetime          OldestOpenTime(void)
+     {
+      datetime oldest=0;
+      for(int i=PositionsTotal()-1;i>=0;i--)
+        {
+         ulong ticket=PositionGetTicket(i);
+         if(ticket==0 || !Mine())
+            continue;
+         datetime opened=(datetime)PositionGetInteger(POSITION_TIME);
+         if(oldest==0 || opened<oldest)
+            oldest=opened;
+        }
+      return oldest;
+     }
+
    double            OpenPnl(void)
      {
       double sum=0;
@@ -140,7 +167,8 @@ public:
       bool ok=buy ? m_trade.Buy(lots,m_symbol,0.0,sl,tp,comment)
                   : m_trade.Sell(lots,m_symbol,0.0,sl,tp,comment);
       uint code=m_trade.ResultRetcode();
-      if(!ok || (code!=TRADE_RETCODE_DONE && code!=TRADE_RETCODE_PLACED))
+      if(!ok || (code!=TRADE_RETCODE_DONE && code!=TRADE_RETCODE_DONE_PARTIAL
+                 && code!=TRADE_RETCODE_PLACED))
         {
          info=StringFormat("order rejected: %s",m_trade.ResultRetcodeDescription());
          return false;
@@ -178,7 +206,7 @@ public:
          if(ticket==0 || OrderGetInteger(ORDER_MAGIC)!=m_magic || OrderGetString(ORDER_SYMBOL)!=m_symbol)
             continue;
          requests++;
-         if(!m_trade.OrderDelete(ticket))
+         if(!m_trade.OrderDelete(ticket) || m_trade.ResultRetcode()!=TRADE_RETCODE_DONE)
            {
             failed++;
             lastError=m_trade.ResultRetcodeDescription();

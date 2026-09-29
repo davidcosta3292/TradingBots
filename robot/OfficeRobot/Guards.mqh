@@ -36,6 +36,7 @@ private:
    int               m_closeBuffer;
    datetime          m_newsCheckedAt;
    string            m_newsReason;
+   string            m_upcomingNews;
    datetime          m_sessionCheckedAt;
    string            m_sessionReason;
 
@@ -105,7 +106,7 @@ private:
            }
         }
       if(n==0)
-         return "";
+         return "market hours unavailable: no new trades";
 
       // Sessions that touch (23:59 -> 00:00) are one stretch of trading.
       datetime ms[],me[];
@@ -160,6 +161,7 @@ public:
       m_closeBuffer=closeBufferMinutes;
       m_newsCheckedAt=0;
       m_newsReason="";
+      m_upcomingNews="";
       m_sessionCheckedAt=0;
       m_sessionReason="";
 
@@ -238,6 +240,8 @@ public:
          return m_newsReason;
       m_newsCheckedAt=now;
       m_newsReason="";
+      m_upcomingNews="";
+      datetime nextAt=0;
 
       string currencies[2];
       currencies[0]=SymbolInfoString(m_symbol,SYMBOL_CURRENCY_BASE);
@@ -247,19 +251,41 @@ public:
          if(currencies[c]=="" || (c==1 && currencies[1]==currencies[0]))
             continue;
          MqlCalendarValue values[];
-         if(!CalendarValueHistory(values,now-m_newsAfter*60,now+m_newsBefore*60,NULL,currencies[c]))
-            continue;
+         ResetLastError();
+         int count=CalendarValueHistory(values,now-m_newsAfter*60,now+3600,NULL,currencies[c]);
+         if(count<0)
+           {
+            m_newsReason=StringFormat("news calendar unavailable (error %d): no new trades",GetLastError());
+            return m_newsReason;
+           }
          for(int i=0;i<ArraySize(values);i++)
            {
             MqlCalendarEvent ev;
-            if(!CalendarEventById(values[i].event_id,ev) || ev.importance!=CALENDAR_IMPORTANCE_HIGH)
+            if(!CalendarEventById(values[i].event_id,ev))
+              {
+               m_newsReason="news calendar unavailable (event lookup failed): no new trades";
+               return m_newsReason;
+              }
+            if(ev.importance!=CALENDAR_IMPORTANCE_HIGH)
                continue;
-            m_newsReason=StringFormat("news: %s %s at %s Prague",currencies[c],ev.name,
-                                      TimeToString(ClockServerToPrague(values[i].time),TIME_MINUTES));
-            return m_newsReason;
+            string eventText=StringFormat("%s %s at %s Prague",currencies[c],ev.name,
+                                          TimeToString(ClockServerToPrague(values[i].time),TIME_MINUTES));
+            if(values[i].time>now && (nextAt==0 || values[i].time<nextAt))
+              {
+               nextAt=values[i].time;
+               m_upcomingNews=eventText;
+              }
+            if(values[i].time<=now+m_newsBefore*60 && m_newsReason=="")
+               m_newsReason="news: "+eventText;
            }
         }
       return m_newsReason;
+     }
+
+   string            UpcomingNews(void)
+     {
+      NewsReason();
+      return m_upcomingNews;
      }
   };
 

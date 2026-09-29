@@ -48,7 +48,7 @@ if (-not $editor -or -not (Test-Path $editor)) {
 
 $log = Join-Path $target 'compile.log'
 Remove-Item $log -ErrorAction SilentlyContinue
-Start-Process -FilePath $editor -ArgumentList "/compile:`"$target\OfficeRobot.mq5`"", "/log:`"$log`"" -Wait -NoNewWindow
+Start-Process -FilePath $editor -ArgumentList "/compile:`"$target\OfficeRobot.mq5`"", "/log:`"$log`"" -Wait -WindowStyle Hidden
 $text = if (Test-Path $log) { Get-Content $log -Raw -Encoding Unicode } else { '' }
 $text -split "`r?`n" | Where-Object { $_ -match 'error|warning|Result' } | ForEach-Object { Write-Host $_ }
 

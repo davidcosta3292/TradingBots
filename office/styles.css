@@ -236,6 +236,10 @@ main { max-width: 1120px; margin: 0 auto; padding: 16px; }
 .blocks.needs-you { border-left-color: var(--orange); background: rgba(240, 138, 75, 0.08); }
 .blocks.needs-you span { color: var(--orange); }
 .blocks.needs-you .resume { color: var(--ink); }
+.upcoming-news { margin: 9px 0 0; padding: 9px 12px; border: 1px solid rgba(165, 139, 242, .28); border-radius: 8px; background: rgba(165, 139, 242, .06); color: var(--muted); font-size: 12.5px; }
+.upcoming-news b { display: block; color: var(--lavender); margin-bottom: 3px; }
+.exercise-note { margin: 8px 0 10px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.exercise-note b { color: var(--gold); }
 
 .warn { margin: 0; color: var(--red); font-size: 13px; }
 .viewonly, .hint { margin: 0; color: var(--faint); font-size: 12.5px; }

@@ -3,7 +3,7 @@
 // robot's owner can press Start, Pause, Done for today and Close everything;
 // the robot confirms each press. Add ?demo to the address to preview with
 // sample robots, no Supabase needed.
-import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=8';
+import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=9';
 import { COLORS, EYES, GEAR, lookOf } from './looks.js?v=8';
 import { ASSIGNMENTS, assignmentOf, isTrader } from './assignments.js?v=8';
 import { play, setSound, soundOn } from './sounds.js?v=5';
@@ -181,7 +181,7 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=8')
+  officeLoading ??= import('./scene.js?v=9')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
@@ -620,6 +620,7 @@ function card(r) {
     </header>
 
     <p class="seen">${seenText(r, online)}</p>
+    ${s.exercise_mode ? `<p class="exercise-note"><b>Demo exercise</b> · EMA bias on closed M1 bars · timed exit after ${esc(s.exercise_hold_minutes ?? 3)} min or stop/target · ${esc(s.risk_pct ?? 0.05)}% risk per entry. This is an execution check, not a validated strategy.</p>` : ''}
 
     ${positions.length
       ? positions.map((p) => positionRow(p, r, currency)).join('')
@@ -640,6 +641,7 @@ function card(r) {
       <span>${r.state === 'active' ? 'Not opening trades because' : 'Also holding it back'}</span>
       <ul>${blocks.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>
       ${note ? `<p class="resume">${esc(note)}</p>` : ''}</div>` : ''}
+    ${online && s.upcoming_news ? `<p class="upcoming-news"><b>News watch · next hour</b> ${esc(s.upcoming_news)}</p>` : ''}
     ${s.link_error ? `<p class="warn">${esc(s.link_error)}</p>` : ''}
 
     ${mine ? buttons(r, online, command)

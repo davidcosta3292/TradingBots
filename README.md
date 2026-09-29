@@ -20,7 +20,7 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0007`.
+2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0008`.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in. An office member can create up to six slots from the hosted page; administrators can also use the helpers below:
@@ -94,7 +94,7 @@ Robots say what they just did in a speech bubble. The right-hand monitor on each
 4. **Attach it:** open an **XAUUSD** chart and drag **OfficeRobot** onto it from *Navigator → Expert Advisors*. Then, under **Inputs**:
    - `Supabase project URL`, `Supabase publishable key`, and your own robot's token;
    - `Magic number`: **101** for Robot 01, **102** for Robot 02.
-5. Switch on **Algo Trading** in the MetaTrader toolbar. The chart shows `PAUSED | office link: ok`, and the robot appears in the office. Press **Start** there.
+5. Switch on **Algo Trading** in the MetaTrader toolbar. The chart shows `PAUSED | office link: ok`, and the robot appears in the office. Press **Start** there. After an update, remove and reattach the EA so its new Inputs load; it starts paused again.
 
 **On a Mac:** download [OfficeRobot-source.zip](https://trading-office-puce.vercel.app/downloads/OfficeRobot-source.zip) directly from the office site. Unzip it. In MetaTrader 5 choose **File → Open Data Folder**, then copy the entire `OfficeRobot` folder to `MQL5/Experts`. Open `OfficeRobot.mq5` in MetaEditor and press F7 to compile. Add the Supabase URL to allowed WebRequest URLs, attach the Trader EA to your own FTMO demo chart, set a unique magic number, paste your own token, and turn on Algo Trading. The Windows `install.ps1` script does not run on macOS. After editing robot source, regenerate the download with `tools/package-robot.ps1` before deploying. Keep one active Trader EA per FTMO account until a shared account-level risk budget exists.
 
@@ -119,12 +119,14 @@ Robots say what they just did in a speech bubble. The right-hand monitor on each
 | Maximum Daily Loss | 5% of the initial balance, from the balance at 00:00 Prague, counting open trades | Closes its trades and stops for the day at **4%** |
 | Maximum Loss | 10% of the initial balance | Closes its trades and stays paused at **8%** |
 | Market closing (gap trading) | No new trades 2 hours or less before a close of 2 hours or more | Same, e.g. before the weekend |
-| High-impact news | Restricted on funded Standard accounts | No new trades 15 minutes either side of high-impact news for the symbol's currencies |
+| High-impact news | Restricted on funded Standard accounts | Scans the MT5 calendar for the symbol's currencies; warns up to one hour ahead, blocks new entries 15 minutes either side, and blocks entries if the calendar query fails |
 | Server requests | Flagged above 2,000 a day | Stops opening trades after 200 |
 | Account type | — | Refuses to trade anything but a demo account (setting `Demo only`) |
 
-Risk per trade is 0.5% of the initial balance, with at most 4 trades a day between 08:00 and 20:00 Prague. All of these can be changed in the robot's inputs.
+The current exercise defaults to 0.05% risk per entry, at most 2 entries a day, between 08:00 and 20:00 Prague. The broker-side stop and target remain in place even if MetaTrader disconnects. Exercise mode refuses non-demo accounts, risk above 0.1%, and more than 2 entries a day.
 
 ## The strategy
 
-Until we fill in the [strategy card](plan/strategy-card.md), the robot trades a common placeholder: an EMA 20/50 crossover on M15, with the stop at 1.5 × ATR and the target at 2 × the stop. The strategy lives in `robot/OfficeRobot/Strategy.mqh`, apart from everything else, so replacing it doesn't touch the buttons or the FTMO rules.
+Until we fill in the [strategy card](plan/strategy-card.md), **Demo exercise** is the default. On a closed M1 bar, the robot buys when EMA 5 is above EMA 13, or sells when it is below. It closes its own position after 3 minutes, or sooner at the broker-side stop or target. This is an execution check, not a profitability claim. It will only open after its owner presses Start and every FTMO guard allows the entry. A quiet market, news pause, unavailable calendar, or off-hours can delay it. `InpExerciseMode=false` restores the EMA crossover mode. The strategy lives in `robot/OfficeRobot/Strategy.mqh`, apart from the buttons and FTMO limits.
+
+Telegram already receives confirmed controls and trade events. At 20:00 Prague, on days a Trader reported, it also sends a generic check-in linking to the signed-in office. Detailed balances and P&L stay in the office. The EA's news watch alerts Telegram as a high-impact event approaches and when its entry pause begins or ends. A separate news agent that can talk to Traders is a later build step; see [the news-agent plan](plan/news-agent.md).

@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { MOODS, moodOf } from './moods.js?v=8';
+import { MOODS, moodOf } from './moods.js?v=9';
 import { lookOf } from './looks.js?v=8';
 import { assignmentOf } from './assignments.js?v=8';
 

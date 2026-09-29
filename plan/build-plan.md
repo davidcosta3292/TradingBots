@@ -1,6 +1,6 @@
 # Build plan
 
-v1 · 24 Sep 2026. How we get from [the plan PDF](Trading-Office-Plan.pdf) to a robot trading a demo account that we control from the office.
+Started 24 Sep 2026; updated 29 Sep. How we get from [the plan PDF](Trading-Office-Plan.pdf) to a robot trading a demo account that we control from the office.
 
 ## Decided
 
@@ -8,7 +8,7 @@ v1 · 24 Sep 2026. How we get from [the plan PDF](Trading-Office-Plan.pdf) to a 
 - **Where it runs:** our own PC during demo. The robot moves to a VPS for the last 1–2 weeks of demo, then goes live on the VPS.
 - **FTMO, 2-Step rules, demo only for now** (24 Sep): FTMO Free Trials on MetaTrader 5, to see whether the robot fits the challenge's rules.
 - **Two accounts, two robots, one office** (24 Sep): one FTMO account each. Only a robot's owner can press its buttons; the other watches.
-- **Placeholder strategy** (24 Sep): a common EMA crossover until the strategy card is filled in.
+- **Execution exercise** (29 Sep): demo-only EMA bias on M1 with a three-minute exit and tiny risk, until the strategy card is filled in.
 
 ## Still open
 
@@ -54,12 +54,12 @@ Each milestone ends with something we can see working.
 
 ### M1 · The buttons, on a test robot (me)
 
-**Status (25 Sep):** Robot 01 is live on FTMO demo account 1514746116. It reports to Supabase, and Telegram announced its start. A Pause sent through the database was confirmed in 2.3 seconds. The robot trades the placeholder strategy instead of timed test trades. Still to check: Start from the control page with a real login, Close everything on an open position, and the offline alert. Setup steps are in the [README](../README.md).
+**Status (29 Sep):** Robot 01 previously reported from FTMO demo account 1514746116 and confirmed office controls. OfficeRobot 1.1.0 now has a demo exercise that can open on a closed M1 bar and close after three minutes, plus a fail-closed news watch. It compiled locally with zero errors and was copied into MT5. The terminal was closed when setup began and its saved chart did not load the EA on restart; attaching it and observing a complete demo round trip are still outstanding. Setup steps are in the [README](../README.md).
 
 This is the skeleton everything else hangs on, built before the strategy exists.
 
 - A project repo, and database tables for robots, commands, heartbeats, positions and deals.
-- A **test robot** on the demo account. It has no strategy. While Start is on, it opens a minimum-size trade on a timer, so there's something to pause and close. It refuses to run on a live account.
+- A **demo exercise** on the account: EMA direction chooses the entry on a closed M1 bar, then a timed exit exercises the close path. It uses a 0.05% risk budget, at most two entries per day, and refuses to run on a live account.
 - The robot side of the contract above: a heartbeat every 30 seconds, a command check every few seconds, and a confirmation for every command.
 - A phone-friendly control page showing each robot's state and the four buttons. It's the plain version of the office panel; the 3D office comes in M4.
 - Telegram alerts for: heartbeat lost, command not confirmed, robot restarted.
@@ -93,7 +93,7 @@ This is the skeleton everything else hangs on, built before the strategy exists.
   - Speech bubbles for what each robot just did, and a trade history chart on each desk and card.
   - A camera tour, and the camera following the selected robot.
   - Optional sounds, and a colour and gear per robot, chosen by its owner.
-- **Still to come:** the page online, for phones.
+- **Online now:** the Vercel office works on phones and Macs; only connected Trader EAs are operational.
 
 Telegram now also reports every button press the robot answers, and every trade it opens or closes, the moment it happens.
 
@@ -102,7 +102,7 @@ Telegram now also reports every button press the robot answers, and every trade 
 
 ### M5 · AI helpers (read-only)
 
-- A morning and evening report on Telegram.
+- A separate structured [news agent](news-agent.md) and optional reports. The current Trader EA watches the MT5 calendar and sends news-window alerts; the scheduled Telegram check-in links to the private office without financial figures.
 - Ask about any robot, e.g. "why did we lose today?".
 - The helpers read the database only. They can't press buttons.
 

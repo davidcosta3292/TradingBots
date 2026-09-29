@@ -74,6 +74,20 @@ public:
       return SIGNAL_NONE;
      }
 
+   // Demo exercise: take the direction of the last closed bar's EMA bias.
+   // This gives us an observable entry without waiting for a rare crossover.
+   ENUM_SIGNAL       Bias(void)
+     {
+      double fast[],slow[];
+      if(CopyBuffer(m_fastHandle,0,1,1,fast)!=1 || CopyBuffer(m_slowHandle,0,1,1,slow)!=1)
+         return SIGNAL_NONE;
+      if(fast[0]>slow[0])
+         return SIGNAL_BUY;
+      if(fast[0]<slow[0])
+         return SIGNAL_SELL;
+      return SIGNAL_NONE;
+     }
+
    double            Atr(void)
      {
       double atr[];
