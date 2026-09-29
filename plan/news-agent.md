@@ -1,17 +1,24 @@
-# News watch now; separate news agent later
+# Fundamental Analyst · news watcher
 
-## What runs now
+## Running now
 
-OfficeRobot 1.1 checks MetaTrader 5's economic calendar for the chart symbol's currencies once a minute. It reports the next high-impact event up to one hour ahead, blocks new entries from 15 minutes before until 15 minutes after, and announces the warning, pause and clearing through the existing office event channel and Telegram. If the calendar request fails, it blocks new entries and reports the error. Existing positions retain their broker-side stop and target and can still exit.
+The **Fundamental Analyst** is a separate read-only program on David's PC. Every five minutes it reads the public Forex Factory weekly calendar export and RSS feeds from Investing.com, Bloomberg and the Wall Street Journal's Dow Jones feed. It records source, headline or USD event title, link and feed time in Supabase. It shows the next USD high/medium-impact events and recent gold-relevant headlines in the shared office. Source health is visible so a broken feed does not look like a quiet market.
 
-This is a fixed rule inside each Trader EA. There is no separate AI news robot running today. The **Risk manager**, **Coordinator** and **Analyst** office assignments remain planned labels.
+The matching is deterministic: headlines with words such as gold, XAU, Fed, CPI, PCE, payrolls and yields appear first. A match is **not** a forecast of price direction, a complete reading of the article, or a trade signal. No paywalled article body is fetched. Open the linked publication for context. Investing.com RSS omits an explicit time zone; the watcher interprets those feed times as UTC.
 
-## Separate service when we need one
+Supabase stores the items under `news_items` and deduplicates them. At most one short Telegram alert is issued per 30 minutes, for a newly seen highly relevant headline from the last hour or an upcoming high-impact USD event within 90 minutes. The existing Telegram bot sends it to its configured private chat and group. Full source lists are in the office card; messages are informational.
 
-1. Run a news watcher outside MetaTrader on the owner's PC or a supported server. Ingest structured calendar events with event ID, currency, importance, scheduled time, source and last checked time.
-2. Publish observations to a dedicated Supabase table with an expiry time. A planned agent can summarize the events to Telegram and explain which Traders they affect.
-3. Add an explicit, time-limited **external news block** to the Trader EA. The EA will still enforce its own market-hours, FTMO and local calendar guards; an external service can only add a restriction, never remove one.
-4. Show the source, expiry and reason in the office. Alert if either calendar feed becomes stale. Deduplicate repeated news messages.
-5. Keep strategy signals and order placement inside the Trader EA. A language model may explain news, but it cannot send arbitrary trade commands or turn off a guard.
+This Analyst has a separate token and a separate `analyst_sync` reporting function. It cannot call the Trader's reporting door, cannot press office trade controls, and never has access to MetaTrader, broker credentials or orders. The Trader EA still uses its own MT5 calendar news guard and its own strategy and FTMO protections. The Analyst currently **does not block or approve trades**.
 
-Before building this, confirm the chosen event source and how the two owners want Telegram routed (shared group or separate chats). The current single configured chat receives the Trader EA's news events.
+## Run on a PC
+
+1. Create a **Fundamental Analyst** office slot, or use the one already created for David. Its token is shown once when created.
+2. Copy `news/config.example.json` to `news/config.json`. Fill in the Supabase URL, publishable key, and this Analyst's token. Keep `news/config.json` private; it is ignored by Git.
+3. On Windows, double-click `Start Fundamental Analyst.cmd`. On a Mac with Node.js installed, run `node news/analyst.mjs` from the repository directory. Keep the process running. It does not require MetaTrader or a trading account.
+4. Open the office card. **Scanning news** means it has reported within 12 minutes. A feed failure is listed beside that source. **Offline** means the watcher stopped reporting; the configured Telegram bot also announces it.
+
+David's first scan was connected to the existing office on 29 September 2026. The watcher runs on his current Windows PC. If the PC sleeps, shuts down or loses internet, scans stop. The Vercel office website and Supabase database alone do not run the watcher.
+
+## Later
+
+Before letting news affect execution, define a narrow rule such as an additional time-limited entry pause for specific USD events. The Trader EA must continue enforcing its own calendar, FTMO and strategy guards. An outside analyst may only add a restriction, never remove one or send a trade order. A separate AI summarizer would require a provider, costs, source permissions and a review of error handling; it is not part of this version.

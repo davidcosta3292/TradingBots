@@ -7,6 +7,7 @@ export const OFFLINE_AFTER_MS = 75_000;
 
 export const MOODS = {
   planned: { label: 'Role planned', color: '#C89AFF' },
+  analyst: { label: 'Scanning news', color: '#65CFD2' },
   trade: { label: 'In a trade', color: '#3DDC84' },
   active: { label: 'Working', color: '#83A6F4' },
   standby: { label: 'Standing by', color: '#A58BF2' },
@@ -75,11 +76,18 @@ export function resumeNote(blocks) {
 }
 
 export function isOnline(robot, now = Date.now()) {
-  return !!robot.last_report_at && now - Date.parse(robot.last_report_at) < OFFLINE_AFTER_MS;
+  const threshold = robot.assignment === 'analyst' ? 12 * 60_000 : OFFLINE_AFTER_MS;
+  return !!robot.last_report_at && now - Date.parse(robot.last_report_at) < threshold;
 }
 
 // { key, label, block, inTrade }: key is one of MOODS.
 export function moodOf(robot, now = Date.now()) {
+  if (robot.assignment === 'analyst') {
+    if (!robot.last_report_at) return { key: 'planned', label: 'Awaiting setup', block: null, inTrade: false };
+    if (!isOnline(robot, now)) return { key: 'offline', label: 'Offline', block: null, inTrade: false };
+    if (!Number(robot.status?.healthy_feeds)) return { key: 'blocked', label: 'News sources unavailable', block: null, inTrade: false };
+    return { key: 'analyst', label: 'Scanning news', block: null, inTrade: false };
+  }
   if (robot.assignment && robot.assignment !== 'trader')
     return { key: 'planned', label: 'Role planned', block: null, inTrade: false };
   const s = robot.status || {};

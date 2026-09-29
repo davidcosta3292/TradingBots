@@ -1,0 +1,6 @@
+{
+  "url": "https://YOUR-PROJECT.supabase.co",
+  "anonKey": "sb_publishable_YOUR-KEY",
+  "token": "PASTE-ANALYST-TOKEN",
+  "intervalMinutes": 5
+}

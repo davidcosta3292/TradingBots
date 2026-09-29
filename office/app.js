@@ -3,9 +3,9 @@
 // robot's owner can press Start, Pause, Done for today and Close everything;
 // the robot confirms each press. Add ?demo to the address to preview with
 // sample robots, no Supabase needed.
-import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=9';
+import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=11';
 import { COLORS, EYES, GEAR, lookOf } from './looks.js?v=8';
-import { ASSIGNMENTS, assignmentOf, isTrader } from './assignments.js?v=8';
+import { ASSIGNMENTS, assignmentOf, isTrader, isAnalyst } from './assignments.js?v=11';
 import { play, setSound, soundOn } from './sounds.js?v=5';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -26,7 +26,8 @@ const EXIT_REASON = {
 };
 // What each place in the office means, for the legend.
 const LEGEND = [
-  ['planned', 'In the lounge', 'an assignment has been named, but no software runs it yet'],
+  ['planned', 'In the lounge', 'awaiting setup, or a role that has no software yet'],
+  ['analyst', 'At its desk', 'watching economic news and the USD calendar; no trading access'],
   ['active', 'At its desk', 'working, looking for a setup'],
   ['trade', 'Typing at its desk', 'in a trade'],
   ['standby', 'At the coffee bar', 'on, but its own rules say "not now": outside its hours, market closed, or news. It carries on by itself.'],
@@ -181,7 +182,7 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=9')
+  officeLoading ??= import('./scene.js?v=11')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
@@ -378,7 +379,9 @@ async function onClick(event) {
     if (!newRobotToken) return;
     try {
       await navigator.clipboard.writeText(newRobotToken.token);
-      return toast('Robot token copied. Paste it into your own MetaTrader robot settings.');
+      return toast(newRobotToken.assignment === 'analyst'
+        ? 'Analyst token copied. Save it in news/config.json on your PC.'
+        : 'Robot token copied. Paste it into your own MetaTrader robot settings.');
     } catch {
       return toast('Select the token and copy it manually.');
     }
@@ -541,14 +544,18 @@ function renderSetup(robots) {
     setup.dataset.mode = `token:${newRobotToken.id}`;
     setup.hidden = false;
     const trader = newRobotToken.assignment === 'trader';
+    const analyst = newRobotToken.assignment === 'analyst';
     setup.innerHTML = `<h2>${esc(newRobotToken.name)} · ${esc(assignmentOf(newRobotToken).label)}</h2>
       ${trader ? `<p>This token is shown only now. Copy it into the <b>Robot token</b> input of OfficeRobot on your own MetaTrader 5 account.</p>
       <div class="token-line"><code>${esc(newRobotToken.token)}</code><button type="button" data-copy-robot-token>Copy token</button></div>`
-      : '<p>This role is an office assignment only. Its risk, coordination, or analysis software has not been built yet. The MetaTrader trading EA must not be attached to it.</p>'}
+      : analyst ? `<p>This token is shown only now. Copy it into <code>news/config.json</code> on the PC that will run the news watcher. This robot does not connect to MetaTrader or trade.</p>
+      <div class="token-line"><code>${esc(newRobotToken.token)}</code><button type="button" data-copy-robot-token>Copy token</button></div>
+      <p>Copy <code>news/config.example.json</code> to <code>news/config.json</code>, fill in the Supabase URL, publishable key and this token, then run <code>Start Fundamental Analyst.cmd</code> (Windows) or <code>node news/analyst.mjs</code> (Mac). Keep that program running for live news updates.</p>`
+      : '<p>This role is an office assignment only. Its software has not been built yet. The MetaTrader trading EA must not be attached to it.</p>'}
       ${trader ? `
       <p><a href="downloads/OfficeRobot-source.zip" download>Download OfficeRobot source</a>. On Mac: in MetaTrader, open <b>File → Open Data Folder</b>, then copy the unzipped <code>OfficeRobot</code> folder into <code>MQL5/Experts</code>. Open <code>OfficeRobot.mq5</code> in MetaEditor and compile it with F7.</p>
       <p>Attach it to your own FTMO demo chart. Give each Trader EA a different magic number (101, 102, 103…), allow WebRequest to <code>https://tpmrowyqsayyypkxkvfz.supabase.co</code>, paste this token, and enable Algo Trading. It starts paused; press Start here after it reports in.</p>` : ''}
-      <button type="button" data-dismiss-token>${trader ? 'I copied the token' : 'Done'}</button>`;
+      <button type="button" data-dismiss-token>${trader || analyst ? 'I copied the token' : 'Done'}</button>`;
     return;
   }
   const mine = robots.filter((r) => r.owner_id === store.me?.id).length;
@@ -562,7 +569,7 @@ function renderSetup(robots) {
   setup.hidden = false;
   setup.innerHTML = `<button type="button" class="add-robot" data-add-robot aria-expanded="${setupOpen}">
     ${setupOpen ? '− Close' : '+ Add robot'} <small>${mine}/6 yours</small></button>
-    ${setupOpen ? `<p>Choose the assignment first. Trader works with the MetaTrader EA. Other roles are planning slots until their runtime is built.</p>
+    ${setupOpen ? `<p>Trader runs in MetaTrader. Fundamental Analyst watches news on a PC. Risk manager and Coordinator are planning slots.</p>
       <form><label>Name <input name="name" maxlength="40" placeholder="e.g. Gold Trader" required></label>
       <label>Assignment <select name="assignment">${ASSIGNMENTS.map((a) => `<option value="${a.key}">${a.label} · ${a.detail}</option>`).join('')}</select></label>
       <button type="submit">Create robot</button></form>
@@ -594,6 +601,7 @@ function card(r) {
   const mine = store.me && r.owner_id === store.me.id;
   const owner = store.members.get(r.owner_id) || 'Unknown';
   const assignment = assignmentOf(r);
+  if (isAnalyst(r)) return analystCard(r, mood, owner, mine);
   if (!isTrader(r)) return `<article class="robot planned">
     <header class="robot-head"><div><h2>${esc(r.name)}</h2>
       <p class="sub">${esc(owner)}${mine ? ' · yours' : ' · view only'} · ${esc(assignment.label)}</p></div>
@@ -662,11 +670,56 @@ function card(r) {
   </article>`;
 }
 
+function safeNewsLink(item) {
+  try {
+    const url = new URL(item.url);
+    const host = url.hostname.toLowerCase();
+    const domains = ['forexfactory.com', 'investing.com', 'bloomberg.com', 'wsj.com'];
+    return url.protocol === 'https:' && domains.some((d) => host === d || host.endsWith(`.${d}`))
+      ? url.href : null;
+  } catch { return null; }
+}
+
+function newsRow(item, calendar = false) {
+  const url = safeNewsLink(item);
+  const title = esc(item.title);
+  return `<li><span class="news-meta">${esc(item.source)} · ${calendar ? 'Event' : 'Feed'} ${dayTime(item.event_at)}${item.importance ? ` · ${esc(item.importance)} impact` : ''}</span>
+    ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${title}</a>` : `<span>${title}</span>`}</li>`;
+}
+
+function analystCard(r, mood, owner, mine) {
+  const s = r.status || {};
+  const feeds = Array.isArray(s.feeds) ? s.feeds : [];
+  const upcoming = Array.isArray(s.upcoming) ? s.upcoming : [];
+  const headlines = Array.isArray(s.headlines) ? s.headlines : [];
+  const events = store.events.get(r.id) || [];
+  return `<article class="robot analyst-card ${mood.key}">
+    <header class="robot-head"><div><h2>${esc(r.name)}</h2>
+      <p class="sub">${esc(owner)}${mine ? ' · yours' : ' · view only'} · Fundamental Analyst · XAUUSD</p></div>
+      <span class="pill ${mood.key}">${esc(mood.label)}</span></header>
+    <p class="seen">${seenText(r, mood.key !== 'offline' && mood.key !== 'planned')}</p>
+    <p class="flat">Checks economic headlines and upcoming USD releases. Reports observations to the office and Telegram. It cannot trade or control Trader robots.</p>
+    ${r.last_report_at ? `<div class="news-health"><b>Sources ${esc(s.healthy_feeds ?? 0)}/${esc(s.total_feeds ?? 5)} online</b>
+      <small>Last scan ${s.checked_at ? esc(ago(s.checked_at)) : 'unknown'}</small>
+      <div>${feeds.map((f) => `<span class="source-chip ${f.ok ? 'ok' : 'bad'}" title="${esc(f.error || f.feed || '')}">${esc(f.source)} ${f.ok ? '✓' : '!'}</span>`).join('')}</div></div>` : ''}
+    <section class="news-section"><h3>Upcoming USD events</h3>
+      ${upcoming.length ? `<ol>${upcoming.slice(0, 6).map((item) => newsRow(item, true)).join('')}</ol>`
+        : `<p>${r.last_report_at ? 'No upcoming events in this week’s feed. The Trader EA still uses its own MT5 calendar guard.' : 'Waiting for the first scan.'}</p>`}</section>
+    <section class="news-section"><h3>Gold-relevant headlines</h3>
+      ${headlines.length ? `<ol>${headlines.slice(0, 8).map((item) => newsRow(item)).join('')}</ol>`
+        : `<p>${r.last_report_at ? 'No matching headlines in the recent feeds.' : 'Waiting for the first scan.'}</p>`}</section>
+    <p class="viewonly">Relevance is a keyword filter, not a prediction. Read the linked source before making decisions.</p>
+    ${mine ? assignmentPicker(r) + lookPicker(r) : ''}
+    ${events.length ? `<ol class="feed">${events.slice(0, 5).map((e) =>
+      `<li><time>${clock(e.at)}</time>${esc(e.message)}</li>`).join('')}</ol>` : ''}
+  </article>`;
+}
+
 function assignmentPicker(r) {
-  if (r.last_report_at) return '<p class="viewonly">Assignment is fixed after MetaTrader first connects.</p>';
+  if (r.last_report_at) return '<p class="viewonly">Assignment is fixed after the robot first connects.</p>';
   return `<label class="assignment-picker">Assignment
     <select data-assignment="${r.id}">${ASSIGNMENTS.map((a) => `<option value="${a.key}"${assignmentOf(r).key === a.key ? ' selected' : ''}>${a.label}</option>`).join('')}</select>
-    <small>Changing to Trader creates a new one-time MT5 token. Other roles are planning slots.</small></label>`;
+    <small>Trader and Fundamental Analyst receive separate one-time tokens. Risk manager and Coordinator are planning slots.</small></label>`;
 }
 
 function positionRow(p, r, currency) {
@@ -774,7 +827,9 @@ function lookPicker(r) {
 // ---------------------------------------------------------------------------
 
 function seenText(r, online) {
-  if (!r.last_report_at) return 'Never connected yet. Start the robot in MetaTrader.';
+  if (!r.last_report_at) return r.assignment === 'analyst'
+    ? 'Never connected yet. Start the news watcher on its PC.'
+    : 'Never connected yet. Start the robot in MetaTrader.';
   return online ? `Online · reported ${ago(r.last_report_at)}` : `Offline · last report ${ago(r.last_report_at)}`;
 }
 
@@ -846,6 +901,18 @@ function loadDemo() {
     last_report_at: iso(9000), look: {},
     status: { ...base, equity: 24912.7, day_pnl: -87.3, trades_today: 2, daily_used_pct: 7, max_used_pct: 3.5, can_trade: false,
       positions: [], blocks: ['news: USD Non-Farm Employment Change at 14:30 Prague'], last_action: '14:02 Closed by stop loss: -87.30' },
+  });
+  store.robots.set('r3', {
+    id: 'r3', name: 'Fundamental Analyst', assignment: 'analyst', owner_id: 'me',
+    state: 'active', last_report_at: iso(5000), look: {},
+    status: {
+      healthy_feeds: 5, total_feeds: 5, checked_at: iso(5000),
+      feeds: ['Forex Factory', 'Investing.com', 'Bloomberg', 'WSJ'].map((source) => ({ source, ok: true })),
+      upcoming: [{ source: 'Forex Factory', kind: 'calendar', title: 'Sample · USD inflation release',
+        event_at: new Date(now + 90 * 60_000).toISOString(), importance: 'High', url: 'https://www.forexfactory.com/calendar' }],
+      headlines: [{ source: 'Bloomberg', kind: 'headline', title: 'Sample · Fed policy discussion and gold market',
+        event_at: iso(20 * 60_000), url: 'https://www.bloomberg.com/' }],
+    },
   });
   store.lastCommand.set('r2', { id: 7, robot_id: 'r2', type: 'start', created_by: 'friend', created_at: iso(3000000), status: 'done', result: 'working' });
   store.events.set('r1', [

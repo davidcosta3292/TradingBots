@@ -97,7 +97,7 @@ Telegram now also reports every button press the robot answers, and every trade 
 
 ### M5 · AI helpers (read-only)
 
-- A separate structured [news agent](news-agent.md) and optional reports. The current Trader EA watches the MT5 calendar and sends news-window alerts; the scheduled Telegram check-in links to the private office without financial figures.
+- The separate [Fundamental Analyst](news-agent.md) now reads public feeds, fills its office card and sends short Telegram news alerts. The Trader EA still watches the MT5 calendar independently; the scheduled Telegram check-in links to the private office without financial figures.
 - Ask about any robot, e.g. "why did we lose today?".
 - The helpers read the database only. They can't press buttons.
 

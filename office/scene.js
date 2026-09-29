@@ -2,13 +2,13 @@
 // One desk per robot. A robot works at its desk, waits at the coffee bar when
 // its own rules say "not now" (outside its hours, market closed, news), sits
 // on the lounge sofa when we pause it, and dozes grey at its desk when
-// MetaTrader stops reporting. Every screen shows only what the robots report.
+// a running program stops reporting. Every screen shows only what the robots report.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { MOODS, moodOf } from './moods.js?v=9';
+import { MOODS, moodOf } from './moods.js?v=11';
 import { lookOf } from './looks.js?v=8';
-import { assignmentOf } from './assignments.js?v=8';
+import { assignmentOf } from './assignments.js?v=11';
 
 const ROOM = { w: 25, d: 18, h: 4.6 };
 const CORRIDOR_X = -2.8;
@@ -419,17 +419,28 @@ function buildDesk(scene, slot) {
     if (mood.key === 'planned') {
       ctx.fillStyle = MOODS.planned.color;
       ctx.font = font(52, 700);
-      ctx.fillText('ROLE PLANNED', W / 2, 175);
+      ctx.fillText(robot.assignment === 'analyst' ? 'AWAITING SETUP' : 'ROLE PLANNED', W / 2, 175);
       ctx.fillStyle = MUTED;
       ctx.font = font(25, 400);
-      ctx.fillText(fitText(ctx, assignmentOf(robot).label + ' · no runtime yet', W - 42), W / 2, 240);
+      ctx.fillText(fitText(ctx, robot.assignment === 'analyst'
+        ? 'Start the news watcher on its PC' : assignmentOf(robot).label + ' · no runtime yet', W - 42), W / 2, 240);
     } else if (mood.key === 'offline') {
       ctx.fillStyle = RED;
       ctx.font = font(64, 700);
       ctx.fillText('OFFLINE', W / 2, 190);
       ctx.fillStyle = MUTED;
       ctx.font = font(26, 400);
-      ctx.fillText('No report from MetaTrader', W / 2, 250);
+      ctx.fillText(robot.assignment === 'analyst' ? 'No report from the news watcher' : 'No report from MetaTrader', W / 2, 250);
+    } else if (robot.assignment === 'analyst') {
+      ctx.fillStyle = MOODS.analyst.color;
+      ctx.font = font(47, 700);
+      ctx.fillText('NEWS WATCH', W / 2, 138);
+      ctx.fillStyle = INK;
+      ctx.font = font(27);
+      ctx.fillText(`${s.healthy_feeds ?? 0}/${s.total_feeds ?? 5} sources online`, W / 2, 196);
+      ctx.fillStyle = MUTED;
+      ctx.font = font(22, 400);
+      ctx.fillText(fitText(ctx, s.headlines?.[0]?.title || 'Waiting for headlines', W - 42), W / 2, 260);
     } else if (positions.length) {
       const p = positions[0];
       const pnl = Number(p.profit);
@@ -484,6 +495,30 @@ function buildDesk(scene, slot) {
       ctx.fillStyle = MUTED;
       ctx.font = font(23, 400);
       ctx.fillText('No account or agent connected', W / 2, 205);
+      tex.texture.needsUpdate = true;
+      return;
+    }
+    if (robot.assignment === 'analyst') {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = MOODS.analyst.color;
+      ctx.font = font(27, 700);
+      ctx.fillText('USD CALENDAR', 24, 44);
+      const upcoming = Array.isArray(s.upcoming) ? s.upcoming : [];
+      if (!upcoming.length) {
+        ctx.fillStyle = MUTED;
+        ctx.font = font(23, 400);
+        ctx.fillText('No upcoming USD events in the feed', 24, 125);
+      }
+      upcoming.slice(0, 4).forEach((item, i) => {
+        const at = new Date(item.event_at);
+        const time = Number.isFinite(at.getTime()) ? at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        ctx.fillStyle = item.importance === 'High' ? GOLD : INK;
+        ctx.font = font(22, 600);
+        ctx.fillText(fitText(ctx, `${time}  ${item.title}`, W - 48), 24, 102 + i * 50);
+      });
+      ctx.fillStyle = MUTED;
+      ctx.font = font(20, 400);
+      ctx.fillText('Read-only · Trader uses its own MT5 news guard', 24, 305);
       tex.texture.needsUpdate = true;
       return;
     }
@@ -592,7 +627,7 @@ function buildDesk(scene, slot) {
       accentMat.color.set(color);
       drawMain(screens[0], robot, mood, color);
       // The right-hand monitor takes turns: FTMO limits, then the last 7 days.
-      if (history && Math.floor(Date.now() / 10_000) % 2 === 1) drawHistory(screens[1], robot, history);
+      if (robot.assignment !== 'analyst' && history && Math.floor(Date.now() / 10_000) % 2 === 1) drawHistory(screens[1], robot, history);
       else drawLimits(screens[1], robot, mood);
     },
   };
@@ -798,6 +833,7 @@ function placeFor(mood, i) {
     case 'offline': return { spot: desk, pose: 'sleep' };
     case 'trade': return { spot: desk, pose: 'type' };
     case 'active': return { spot: desk, pose: 'watch' };
+    case 'analyst': return { spot: desk, pose: 'type' };
     case 'blocked': return { spot: desk, pose: 'puzzled' };
     case 'standby': return { spot: coffeeSpot(COFFEE_SPOTS[i % COFFEE_SPOTS.length]), pose: 'sip' };
     case 'planned': return { spot: loungeSpot(LOUNGE_SEATS[i % LOUNGE_SEATS.length]), pose: 'rest' };
@@ -1053,7 +1089,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     ctx.fillStyle = MUTED;
     ctx.font = font(30, 400);
     const online = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned').length;
-    const trading = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned' && m.inTrade).length;
+    const trading = moods.filter((m) => m.inTrade && m.key !== 'offline').length;
     ctx.fillText(`${robots.length} robot${robots.length === 1 ? '' : 's'} · ${online} online · ${trading} in a trade`, 40, 246);
 
     // The last 7 days, from the trades the robots reported.

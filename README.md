@@ -20,7 +20,7 @@ MetaTrader 5 + OfficeRobot  ──robot_sync──►  Supabase  ◄──live�
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0009`.
+2. **SQL Editor:** run the files in `supabase/migrations/` in order, `0001` to `0010`.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in. An office member can create up to six slots from the hosted page; administrators can also use the helpers below:
@@ -66,7 +66,7 @@ The office is a static website. Vercel serves only the `office/` folder; Supabas
 1. Import this GitHub repository into Vercel and set **Root Directory** to `office`.
 2. Set **Framework Preset** to **Other**. There is no build command or environment variable to add; `office/config.js` contains only the public Supabase project URL and publishable key.
 3. The deployed page is **https://trading-office-puce.vercel.app/**. The friend can open it on a Mac without cloning GitHub or installing MetaTrader just to view the office. The demo is at https://trading-office-puce.vercel.app/?demo.
-4. For live data, the friend signs in with their own Supabase Auth login. An administrator adds their existing Auth user to `office_members`; a website link alone does not grant database access. Any member can press **+ Add robot**. A **Trader** receives a one-time MetaTrader token and can run the current EA. **Risk manager**, **Coordinator**, and **Analyst** are assignment labels with no runtime yet. Only the owner can press a Trader's controls.
+4. For live data, the friend signs in with their own Supabase Auth login. An administrator adds their existing Auth user to `office_members`; a website link alone does not grant database access. Any member can press **+ Add robot**. A **Trader** receives a one-time MetaTrader token. A **Fundamental Analyst** receives its own news-watcher token. **Risk manager** and **Coordinator** remain assignment labels. Only the owner can press a Trader's controls.
 
 Jhonatan's Mac walkthrough is in [plan/friend-setup.md](plan/friend-setup.md). The Oracle free-VPS assessment is in [research/03-oracle-free-tier-vps.md](research/03-oracle-free-tier-vps.md).
 
@@ -78,11 +78,19 @@ In the office, where a robot is tells you what it's doing:
 
 | Where | What it means |
 |---|---|
-| At its desk | Working, looking for a setup. Typing when it's in a trade. |
+| At its desk | Trader working or in a trade, or Fundamental Analyst scanning news. |
 | At the coffee bar | Switched on, but its own rules say "not now": outside its hours, market closed, or news. It carries on by itself. |
 | At its desk, scratching its head | Blocked by something that needs you, like Algo Trading switched off in MetaTrader |
 | On the sofa | Paused, or done for today |
-| Asleep and grey | Offline: MetaTrader isn't reporting |
+| Asleep and grey | Offline: a Trader or Analyst stopped reporting |
+
+### Fundamental Analyst · economic news
+
+The Fundamental Analyst watches the Forex Factory calendar and public Investing.com, Bloomberg and WSJ/Dow Jones RSS feeds for USD releases and headlines relevant to XAUUSD. It is a separate, read-only program. It does not connect to MetaTrader, trade, or control the Trader EA. Its office card shows upcoming events, linked headlines and source health. Important observations can also reach the same Telegram bot's private chat and group, with a 30-minute alert limit. The Trader EA still uses its own MT5 news guard.
+
+David's **Fundamental Analyst** slot is already configured with a private local token. On the current Windows PC, run **`Start Fundamental Analyst.cmd`** in this repository and keep it open. The watcher reports every five minutes; its status becomes offline after 12 minutes without a report. Its token is in the ignored `news/config.json` file and must never be put in `office/config.js` or GitHub.
+
+For another Analyst, use **+ Add robot → Fundamental Analyst** in the office, copy its one-time token, copy `news/config.example.json` to `news/config.json` on the PC that will run it, fill in the Supabase URL and publishable key, and run `node news/analyst.mjs`. Read [plan/news-agent.md](plan/news-agent.md) for its limits and source behavior.
 
 Robots say what they just did in a speech bubble. The right-hand monitor on each desk takes turns between the FTMO limits and the last 7 days of trades. **Tour** flies the camera from robot to robot, **Legend** explains the places, and **Sound** turns on small sounds for trades and button presses. Each robot's owner can change its colour and gear under **Look in the office** in its card.
 
@@ -133,4 +141,4 @@ The broker-side stop and target remain in place even if MetaTrader disconnects. 
 
 The [strategy review](plan/forex-strategy-review.md) gives the exact definitions and differences from the supplied discretionary PDF. This draft is for observing execution in demo; no profitability has been established. After replacing the EA, check that the chart reports version **1.2.2** and the robot is **Paused**, then press Start. The strategy lives in `robot/OfficeRobot/Strategy.mqh`, apart from the buttons and account risk guards.
 
-Telegram already receives confirmed controls and trade events. At 20:00 Prague, on days a Trader reported, it also sends a generic check-in linking to the signed-in office. Detailed balances and P&L stay in the office. The EA's news watch alerts Telegram as a high-impact event approaches and when its entry pause begins or ends. A separate news agent that can talk to Traders is a later build step; see [the news-agent plan](plan/news-agent.md).
+Telegram already receives confirmed controls and trade events. At 20:00 Prague, on days a Trader reported, it also sends a generic check-in linking to the signed-in office. Detailed balances and P&L stay in the office. The EA's MT5 news guard alerts Telegram as a high-impact event approaches and when its entry pause begins or ends. The separate Fundamental Analyst now watches external headlines and the Forex Factory calendar and posts read-only observations; see [the news-agent plan](plan/news-agent.md).

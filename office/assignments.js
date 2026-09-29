@@ -1,9 +1,10 @@
-// Assignment names the intended job. Only Trader has a running implementation.
+// Trader runs in MT5; Fundamental Analyst runs as a separate news watcher.
 export const ASSIGNMENTS = [
   { key: 'trader', label: 'Trader', detail: 'MetaTrader EA · strategy and FTMO guards' },
   { key: 'risk_manager', label: 'Risk manager', detail: 'Planned · portfolio-level risk review' },
   { key: 'coordinator', label: 'Coordinator', detail: 'Planned · supervise sessions and assignments' },
-  { key: 'analyst', label: 'Analyst', detail: 'Planned · review trades and feedback' },
+  { key: 'analyst', label: 'Fundamental Analyst', detail: 'News and USD calendar · no trading access' },
 ];
 export const assignmentOf = (robot) => ASSIGNMENTS.find((a) => a.key === robot.assignment) || ASSIGNMENTS[0];
 export const isTrader = (robot) => assignmentOf(robot).key === 'trader';
+export const isAnalyst = (robot) => assignmentOf(robot).key === 'analyst';
