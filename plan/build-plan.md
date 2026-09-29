@@ -8,16 +8,11 @@ Started 24 Sep 2026; updated 29 Sep. How we get from [the plan PDF](Trading-Offi
 - **Where it runs:** our own PC during demo. The robot moves to a VPS for the last 1–2 weeks of demo, then goes live on the VPS.
 - **FTMO, 2-Step rules, demo only for now** (24 Sep): FTMO Free Trials on MetaTrader 5, to see whether the robot fits the challenge's rules.
 - **Two accounts, two robots, one office** (24 Sep): one FTMO account each. Only a robot's owner can press its buttons; the other watches.
-- **Execution exercise** (29 Sep): demo-only EMA bias on M1 with a three-minute exit and tiny risk, until the strategy card is filled in.
+- **XAUUSD strategy draft** (29 Sep): replaced the three-minute execution exercise with a measurable 4H-led, 15M entry plan for demo. The rules and limitations are in [forex-strategy-review.md](forex-strategy-review.md).
 
 ## Still open
 
-These block the first line of robot code:
-
-- **Platform:** MetaTrader 5 (forex, gold) or NinjaTrader 8 (futures). It follows from what the strategy trades.
-- **The strategy card:** our rules on one page ([strategy-card.md](strategy-card.md)).
-
-These are needed before going live, not before building: venue, demo length, kill rules, who does what.
+The platform is MetaTrader 5. Before going live, compare the draft's signals with marked examples, measure demo results and FTMO rule adherence, complete the [strategy card](strategy-card.md), decide the demo length and responsibilities, and review the controls for a live release.
 
 ## How the four buttons behave
 

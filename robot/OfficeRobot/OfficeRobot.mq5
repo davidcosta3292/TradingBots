@@ -1,8 +1,7 @@
 //+------------------------------------------------------------------+
 //| OfficeRobot.mq5                                                  |
 //| Demo robot for the Trading Office.                               |
-//|  - Demo exercise opens and closes small positions to prove the   |
-//|    full execution path; EMA cross remains available.            |
+//|  - Draft XAUUSD plan: H4-led trend, M15 structure/pullback.      |
 //|  - Enforces the FTMO 2-Step rules itself (see Guards.mqh).       |
 //|  - Obeys Start / Pause / Done for today / Close everything from  |
 //|    the office and confirms every command.                        |
@@ -10,8 +9,8 @@
 //|    Start in the office.                                          |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "1.10"
-#property description "Trading Office robot: demo execution exercise or EMA cross, FTMO guards, office controls."
+#property version     "1.20"
+#property description "Trading Office robot: XAUUSD plan draft, demo only, FTMO guards, office controls."
 
 #include "Clock.mqh"
 #include "Json.mqh"
@@ -20,7 +19,7 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.1.0"
+#define ROBOT_VERSION "1.2.0"
 // Our office. Used whenever the URL or key input is left empty.
 #define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
 #define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
@@ -41,22 +40,16 @@ input int             InpReportSeconds      = 30;          // Send a full report
 
 input group "Robot"
 input long            InpMagic              = 101;         // Magic number (one per robot)
-input bool            InpDemoOnly           = true;        // Refuse to trade on non-demo accounts
 
-input group "Strategy (demo exercise until we choose ours)"
-input bool            InpExerciseMode       = true;        // Demo only: EMA bias entry, timed exit
-input int             InpExerciseHoldMinutes= 3;           // Close exercise trade after this time
-input ENUM_TIMEFRAMES InpTimeframe          = PERIOD_M1;   // Timeframe for signals
-input int             InpFastEma            = 5;           // Fast EMA period
-input int             InpSlowEma            = 13;          // Slow EMA period
-input int             InpAtrPeriod          = 14;          // ATR period
-input double          InpStopAtr            = 1.5;         // Stop distance = ATR x this
-input double          InpTargetR            = 2.0;         // Target distance = stop x this
-input bool            InpExitOnOppositeCross= true;        // Close on the opposite cross
-input double          InpRiskPercent        = 0.05;        // Risk per trade, % of initial balance
-input int             InpMaxTradesPerDay    = 2;           // Max new trades per FTMO day
-input int             InpStartHourPrague    = 8;           // No new trades before this hour (Prague)
-input int             InpEndHourPrague      = 20;          // No new trades from this hour (Prague)
+input group "XAUUSD strategy draft (demo only)"
+input double          InpTargetR            = 3.0;         // Broker target at 3 times initial risk
+input double          InpRiskPercent        = 0.10;        // Full setup: % of initial balance; half if one trend conflicts
+input double          InpMaxLots            = 1.0;         // Never exceed this size
+input int             InpMaxTradesPerDay    = 5;           // Maximum filled entries per Prague day
+input int             InpMaxHoldHours       = 6;           // Time exit if stop or target has not fired
+input int             InpLossCooldownMinutes= 30;          // No new entry after one losing position
+input int             InpStartHourNewYork   = 8;           // No new entries before this NY hour
+input int             InpEndHourNewYork     = 13;          // No new entries from this NY hour
 input int             InpMaxSlippagePoints  = 30;          // Max slippage, points
 
 input group "FTMO 2-Step rules"
@@ -73,7 +66,7 @@ input int             InpMaxRequestsPerDay  = 200;         // Order budget per d
 input int             InpTesterGmtOffset    = 2;           // Strategy Tester only: server time minus GMT, hours
 
 CFtmoGuards      g_guards;
-CEmaCross        g_strategy;
+CPlanStrategy    g_strategy;
 COfficeTrader    g_trader;
 COfficeLink      g_link;
 
@@ -87,7 +80,8 @@ string           g_blocks[];               // why the robot can't open a trade r
 string           g_lastAction="";
 string           g_lastNewsReason="";
 string           g_lastUpcomingNews="";
-int              g_exerciseCloseFailures=0;
+int              g_holdCloseFailures=0;
+datetime         g_lastHoldAttempt=0;
 long             g_doneIds[];              // commands already carried out
 
 //+------------------------------------------------------------------+
@@ -218,17 +212,25 @@ void RefreshBlocks(void)
    ArrayResize(g_blocks,0);
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
       AddBlock("Algo Trading is switched off in MetaTrader");
-   if((InpDemoOnly || InpExerciseMode) && AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
-      AddBlock("not a demo account (this robot is set to demo only)");
+   if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
+      AddBlock("not a demo account (this version cannot trade live)");
+   if(SymbolInfoString(_Symbol,SYMBOL_CURRENCY_BASE)!="XAU"
+      || SymbolInfoString(_Symbol,SYMBOL_CURRENCY_PROFIT)!="USD")
+      AddBlock("this strategy only trades gold quoted in USD (XAUUSD)");
    if(g_maxStopTripped)
       AddBlock("max-loss stop reached");
    if(g_guards.DailyStopTripped())
       AddBlock("daily loss stop reached");
-   int hour=ClockPragueHour();
-   if(hour<InpStartHourPrague || hour>=InpEndHourPrague)
-      AddBlock(StringFormat("outside trading hours (%02d:00-%02d:00 Prague)",InpStartHourPrague,InpEndHourPrague));
+   MqlDateTime ny;
+   TimeToStruct(ClockNewYork(),ny);
+   if(ny.hour<InpStartHourNewYork || ny.hour>=InpEndHourNewYork
+      || ny.hour==9 || ny.hour==11)
+      AddBlock("outside entry windows (08:00-09:00, 10:00-11:00, 12:00-13:00 New York)");
    if(g_guards.TradesToday()>=InpMaxTradesPerDay)
       AddBlock(StringFormat("already %d trades today",g_guards.TradesToday()));
+   string loss=g_guards.LossReason(InpLossCooldownMinutes);
+   if(loss!="")
+      AddBlock(loss);
    if(g_guards.RequestsToday()>=InpMaxRequestsPerDay)
       AddBlock(StringFormat("order budget used (%d requests today)",g_guards.RequestsToday()));
    string session=g_guards.SessionReason();
@@ -285,7 +287,8 @@ void QueueRecentDeals(void)
    for(int i=0;i<total;i++)
      {
       ulong ticket=HistoryDealGetTicket(i);
-      if(ticket>0 && HistoryDealGetInteger(ticket,DEAL_MAGIC)==InpMagic)
+      if(ticket>0 && HistoryDealGetInteger(ticket,DEAL_MAGIC)==InpMagic
+         && HistoryDealGetString(ticket,DEAL_SYMBOL)==_Symbol)
          g_link.QueueDeal(DealJson(ticket));
      }
   }
@@ -303,11 +306,17 @@ string BuildReport(void)
      }
    string status="{"
                  +JKey("version")+JStr(ROBOT_VERSION)
-                 +","+JKey("strategy")+JStr(InpExerciseMode ? "Demo exercise: EMA bias, timed exit" : g_strategy.Name())
-                 +","+JKey("exercise_mode")+JBool(InpExerciseMode)
-                 +","+JKey("exercise_hold_minutes")+JInt(InpExerciseHoldMinutes)
-                 +","+JKey("timeframe")+JStr(TimeframeName(InpTimeframe))
+                 +","+JKey("strategy")+JStr(g_strategy.Name())
+                 +","+JKey("exercise_mode")+JBool(false)
+                 +","+JKey("timeframe")+JStr("M15")
                  +","+JKey("risk_pct")+JNum(InpRiskPercent,2)
+                 +","+JKey("max_lots")+JNum(InpMaxLots,2)
+                 +","+JKey("target_r")+JNum(InpTargetR,1)
+                 +","+JKey("max_hold_hours")+JInt(InpMaxHoldHours)
+                 +","+JKey("trends")+JStr(g_strategy.Trends())
+                 +","+JKey("signal_check")+JStr(g_strategy.Check())
+                 +","+JKey("loss_streak")+JInt(g_guards.ConsecutiveLosses())
+                 +","+JKey("new_york_time")+JStr(TimeToString(ClockNewYork(),TIME_MINUTES))
                  +","+JKey("server")+JStr(AccountInfoString(ACCOUNT_SERVER))
                  +","+JKey("trade_mode")+JStr(TradeModeName())
                  +","+JKey("currency")+JStr(AccountInfoString(ACCOUNT_CURRENCY))
@@ -387,9 +396,14 @@ bool Execute(const string type,string &result)
          result="the daily loss stop was reached, back at 00:00 Prague";
          return false;
         }
-      if(InpExerciseMode && AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
+      if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
         {
-         result="demo exercise only works on a demo account";
+         result="this strategy version only runs on a demo account";
+         return false;
+        }
+      if(g_guards.ConsecutiveLosses()>=2)
+        {
+         result="two consecutive losing trades today, back at 00:00 Prague";
          return false;
         }
       g_state=STATE_ACTIVE;
@@ -512,6 +526,41 @@ void EnforceLimits(void)
      }
   }
 
+void EnforceLossStreak(void)
+  {
+   if(g_state==STATE_ACTIVE && g_guards.ConsecutiveLosses()>=2)
+     {
+      g_state=STATE_DONE_TODAY;
+      Event("guard","Two consecutive net-losing positions: done for today, back at 00:00 Prague.");
+     }
+  }
+
+// Stop/target live at the broker. This time exit is additional and needs MT5
+// to be running. Retry at most once a minute; pause after three failures.
+void EnforceHoldTime(void)
+  {
+   datetime opened=g_trader.OldestOpenTime();
+   if(opened==0)
+     {
+      g_holdCloseFailures=0;
+      return;
+     }
+   if(TimeTradeServer()-opened<InpMaxHoldHours*3600 || g_holdCloseFailures>=3
+      || (g_lastHoldAttempt>0 && TimeTradeServer()-g_lastHoldAttempt<60))
+      return;
+   g_lastHoldAttempt=TimeTradeServer();
+   string info;
+   bool closed=CloseEverything(info);
+   if(!closed)
+      g_holdCloseFailures++;
+   Event(closed ? "info" : "error","Six-hour plan exit: "+info);
+   if(g_holdCloseFailures>=3)
+     {
+      g_state=STATE_PAUSED;
+      Event("error","Time exit failed three times. Paused; broker stop/target remain. Inspect MetaTrader or use Close everything.");
+     }
+  }
+
 // The calendar is the first news watcher. It alerts the office/Telegram once
 // when a high-impact event approaches, once when entry is blocked, and when
 // the block clears. A separate news agent can use the same event channel later.
@@ -541,57 +590,22 @@ void WatchNews(void)
 //+------------------------------------------------------------------+
 void OnNewBar(void)
   {
-   int direction=g_trader.Direction();
-
-   // Exercise trades have a scheduled exit independent of profit or loss.
-   // SL and TP remain on the broker as backups throughout the hold.
-   if(InpExerciseMode && direction!=0)
-     {
-      datetime opened=g_trader.OldestOpenTime();
-      if(opened>0 && TimeTradeServer()-opened>=InpExerciseHoldMinutes*60
-         && g_exerciseCloseFailures<3)
-        {
-         string info;
-         bool closed=CloseEverything(info);
-         if(!closed)
-            g_exerciseCloseFailures++;
-         Event(closed ? "info" : "error","Demo exercise hold ended: "+info);
-         if(g_exerciseCloseFailures>=3)
-           {
-            g_state=STATE_PAUSED;
-            Event("error","Timed exit failed three times. Paused; broker-side stop and target remain. Inspect MetaTrader or use Close everything.");
-           }
-        }
-      return;
-     }
-   if(direction==0)
-      g_exerciseCloseFailures=0;
-
-   ENUM_SIGNAL signal=InpExerciseMode ? g_strategy.Bias() : g_strategy.Signal();
-
-   // Exits work in every state: open trades always finish normally.
-   if(!InpExerciseMode && direction!=0 && InpExitOnOppositeCross && signal!=SIGNAL_NONE && (int)signal==-direction)
-     {
-      string info;
-      CloseEverything(info);
-      Event("trade","Opposite cross: "+info);
-      direction=g_trader.Direction();
-     }
-
-   if(signal==SIGNAL_NONE || direction!=0 || g_trader.HasPending())
+   double stopPrice=0,riskFactor=0,atr=0;
+   ENUM_SIGNAL signal=g_strategy.Evaluate(stopPrice,riskFactor,atr);
+   g_reportNow=true;                           // show current trend/signal check in office
+   if(signal==SIGNAL_NONE || g_trader.Direction()!=0 || g_trader.HasPending())
       return;
    RefreshBlocks();
    if(g_state!=STATE_ACTIVE || ArraySize(g_blocks)>0)
       return;
 
-   double atr=g_strategy.Atr();
-   if(atr<=0)
+   if(atr<=0 || riskFactor<=0)
       return;
-   double risk=g_guards.Initial()*InpRiskPercent/100.0;
+   double risk=g_guards.Initial()*InpRiskPercent/100.0*riskFactor;
    string info;
    bool sent=false;
-   bool opened=g_trader.Open((int)signal,atr*InpStopAtr,InpTargetR,risk,
-                             (InpExerciseMode ? "demo exercise " : "office ")+ROBOT_VERSION,info,sent);
+   bool opened=g_trader.Open((int)signal,stopPrice,4.0*atr,InpTargetR,risk,
+                             InpMaxLots,"XAU plan "+ROBOT_VERSION,info,sent);
    if(sent)
       g_guards.AddRequest();
    if(opened)
@@ -601,7 +615,7 @@ void OnNewBar(void)
       Print("[Office] Entry order accepted: ",info,". Waiting for the fill.");
      }
    else
-      Event(sent ? "error" : "trade","Skipped a signal: "+info);
+      Event(sent ? "error" : "info","Skipped a plan signal: "+info);
   }
 
 //+------------------------------------------------------------------+
@@ -617,12 +631,13 @@ void ShowOnChart(void)
    double today=equity-g_guards.DayStartBalance();
    Comment(StringFormat("Trading Office robot %s  |  %s  |  %s\n"
                         "%s on %s %s, risk %.2f%% per trade\n"
+                        "%s | %s\n"
                         "Equity %.2f  |  today %s%.2f  |  FTMO daily limit used %.0f%%, max loss used %.0f%%\n"
                         "No new trades because: %s\n"
                         "Last: %s",
                         ROBOT_VERSION,StateLabel(),link,
-                        InpExerciseMode ? "Demo exercise: EMA bias, timed exit" : g_strategy.Name(),
-                        _Symbol,TimeframeName(InpTimeframe),InpRiskPercent,
+                        g_strategy.Name(),_Symbol,"M15",InpRiskPercent,
+                        g_strategy.Trends(),g_strategy.Check(),
                         equity,today>=0 ? "+" : "",today,g_guards.DailyUsedPct(equity),g_guards.MaxUsedPct(equity),
                         blocks,g_lastAction));
   }
@@ -637,16 +652,14 @@ int OnInit(void)
       Print("[Office] The robot's stops must be tighter than FTMO's limits.");
       return INIT_PARAMETERS_INCORRECT;
      }
-   if(InpFastEma>=InpSlowEma || InpRiskPercent<=0 || InpStopAtr<=0 || InpTargetR<=0)
+   if(InpRiskPercent<=0 || InpRiskPercent>0.10 || InpTargetR<2.0 || InpTargetR>4.0
+      || InpMaxLots<=0 || InpMaxLots>1.0 || InpMaxTradesPerDay<1
+      || InpMaxTradesPerDay>5 || InpMaxHoldHours<1 || InpMaxHoldHours>6
+      || InpLossCooldownMinutes<20 || InpLossCooldownMinutes>30
+      || InpStartHourNewYork<0 || InpEndHourNewYork>24
+      || InpStartHourNewYork>=InpEndHourNewYork)
      {
-      Print("[Office] Check the strategy settings.");
-      return INIT_PARAMETERS_INCORRECT;
-     }
-   if(InpExerciseMode && (InpExerciseHoldMinutes<1 || InpExerciseHoldMinutes>60
-                          || InpRiskPercent>0.1 || InpMaxTradesPerDay<1
-                          || InpMaxTradesPerDay>2 || InpTimeframe!=PERIOD_M1))
-     {
-      Print("[Office] Demo exercise requires M1, 1-60 minute hold, <=0.1% risk, and <=2 entries/day.");
+      Print("[Office] Check the XAUUSD demo strategy settings.");
       return INIT_PARAMETERS_INCORRECT;
      }
 
@@ -654,7 +667,7 @@ int OnInit(void)
    g_guards.Init(_Symbol,InpMagic,InpInitialBalance,InpFtmoDailyLossPct,InpFtmoMaxLossPct,
                  InpRobotDailyStopPct,InpRobotMaxStopPct,InpNewsFilter,InpNewsMinutesBefore,
                  InpNewsMinutesAfter,InpCloseBufferMinutes);
-   if(!g_strategy.Init(_Symbol,InpTimeframe,InpFastEma,InpSlowEma,InpAtrPeriod))
+   if(!g_strategy.Init(_Symbol))
      {
       Print("[Office] Could not create the strategy's indicators.");
       return INIT_FAILED;
@@ -673,9 +686,9 @@ int OnInit(void)
 
    QueueRecentDeals();
    Event("started",StringFormat("Started %s on %s %s, account %s (%s), %s. Paused until you press Start.",
-                                ROBOT_VERSION,_Symbol,TimeframeName(InpTimeframe),
+                                ROBOT_VERSION,_Symbol,"M15",
                                 IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)),TradeModeName(),
-                                InpExerciseMode ? "demo exercise" : "EMA cross"));
+                                "XAUUSD plan draft"));
    if(!g_link.Enabled() && !MQLInfoInteger(MQL_TESTER))
       Print("[Office] Office link off (",g_link.LastError(),"), so this robot can't receive Start and stays paused.");
 
@@ -700,7 +713,7 @@ void OnTick(void)
   {
    CheckNewDay();
    EnforceLimits();
-   datetime bar=iTime(_Symbol,InpTimeframe,0);
+   datetime bar=iTime(_Symbol,PERIOD_M15,0);
    if(bar==0 || bar==g_lastBar)
       return;
    bool first=(g_lastBar==0);
@@ -713,6 +726,8 @@ void OnTimer(void)
   {
    CheckNewDay();
    EnforceLimits();
+   EnforceHoldTime();
+   EnforceLossStreak();
    RefreshBlocks();
    WatchNews();
    ShowOnChart();
@@ -733,6 +748,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &
       || HistoryDealGetString(trans.deal,DEAL_SYMBOL)!=_Symbol)
       return;
    g_link.QueueDeal(DealJson(trans.deal));
+   g_guards.InvalidateLosses();
    long entry=HistoryDealGetInteger(trans.deal,DEAL_ENTRY);
    if(entry==DEAL_ENTRY_IN)
      {

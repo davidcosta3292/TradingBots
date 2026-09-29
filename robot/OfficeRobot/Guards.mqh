@@ -39,6 +39,105 @@ private:
    string            m_upcomingNews;
    datetime          m_sessionCheckedAt;
    string            m_sessionReason;
+   datetime          m_lossCheckedAt;
+   datetime          m_lastLossAt;
+   int               m_lossStreak;
+   bool              m_lossHistoryOk;
+
+   // Rebuild closed-position outcomes from broker history, including entry
+   // commission. Partial exits only count after the position is fully closed.
+   void              RefreshLosses(void)
+     {
+      datetime now=TimeTradeServer();
+      if(m_lossCheckedAt>0 && now-m_lossCheckedAt<15)
+         return;
+      m_lossCheckedAt=now;
+      m_lastLossAt=0;
+      m_lossStreak=0;
+      m_lossHistoryOk=HistorySelect(ClockPragueDayStartServer(),now+60);
+      if(!m_lossHistoryOk)
+         return;
+      long ids[];
+      double net[];
+      datetime closedAt[];
+      int n=0;
+      int total=HistoryDealsTotal();
+      for(int i=0;i<total;i++)
+        {
+         ulong ticket=HistoryDealGetTicket(i);
+         if(ticket==0 || HistoryDealGetInteger(ticket,DEAL_MAGIC)!=m_magic
+            || HistoryDealGetString(ticket,DEAL_SYMBOL)!=m_symbol)
+            continue;
+         long entry=HistoryDealGetInteger(ticket,DEAL_ENTRY);
+         if(entry!=DEAL_ENTRY_IN && entry!=DEAL_ENTRY_OUT
+            && entry!=DEAL_ENTRY_OUT_BY && entry!=DEAL_ENTRY_INOUT)
+            continue;
+         long id=HistoryDealGetInteger(ticket,DEAL_POSITION_ID);
+         if(id<=0)
+            continue;
+         int found=-1;
+         for(int j=0;j<n;j++)
+            if(ids[j]==id)
+              {
+               found=j;
+               break;
+              }
+         if(found<0)
+           {
+            found=n++;
+            ArrayResize(ids,n);
+            ArrayResize(net,n);
+            ArrayResize(closedAt,n);
+            ids[found]=id;
+            net[found]=0;
+            closedAt[found]=0;
+           }
+         net[found]+=HistoryDealGetDouble(ticket,DEAL_PROFIT)
+                     +HistoryDealGetDouble(ticket,DEAL_COMMISSION)
+                     +HistoryDealGetDouble(ticket,DEAL_SWAP)
+                     +HistoryDealGetDouble(ticket,DEAL_FEE);
+         if(entry==DEAL_ENTRY_OUT || entry==DEAL_ENTRY_OUT_BY || entry==DEAL_ENTRY_INOUT)
+            closedAt[found]=(datetime)HistoryDealGetInteger(ticket,DEAL_TIME);
+        }
+      datetime latest=0,previous=0;
+      double latestNet=0,previousNet=0;
+      for(int i=0;i<n;i++)
+        {
+         if(closedAt[i]==0)
+            continue;
+         bool stillOpen=false;
+         for(int p=PositionsTotal()-1;p>=0;p--)
+           {
+            ulong ticket=PositionGetTicket(p);
+            if(ticket>0 && PositionGetInteger(POSITION_IDENTIFIER)==ids[i])
+              {
+               stillOpen=true;
+               break;
+              }
+           }
+         if(stillOpen)
+            continue;
+         if(closedAt[i]>=latest)
+           {
+            previous=latest;
+            previousNet=latestNet;
+            latest=closedAt[i];
+            latestNet=net[i];
+           }
+         else if(closedAt[i]>previous)
+           {
+            previous=closedAt[i];
+            previousNet=net[i];
+           }
+        }
+      if(latest>0 && latestNet<0)
+        {
+         m_lossStreak=1;
+         m_lastLossAt=latest;
+         if(previous>0 && previousNet<0)
+            m_lossStreak=2;
+        }
+     }
 
    // The account's first deposit is the FTMO initial balance.
    double            DetectInitialBalance(void)
@@ -77,6 +176,7 @@ private:
          sum+=HistoryDealGetDouble(ticket,DEAL_PROFIT)+HistoryDealGetDouble(ticket,DEAL_COMMISSION)
               +HistoryDealGetDouble(ticket,DEAL_SWAP)+HistoryDealGetDouble(ticket,DEAL_FEE);
          if(HistoryDealGetInteger(ticket,DEAL_MAGIC)==m_magic
+            && HistoryDealGetString(ticket,DEAL_SYMBOL)==m_symbol
             && HistoryDealGetInteger(ticket,DEAL_ENTRY)==DEAL_ENTRY_IN)
             entries++;
         }
@@ -164,6 +264,10 @@ public:
       m_upcomingNews="";
       m_sessionCheckedAt=0;
       m_sessionReason="";
+      m_lossCheckedAt=0;
+      m_lastLossAt=0;
+      m_lossStreak=0;
+      m_lossHistoryOk=true;
 
       m_initial=initialBalance>0 ? initialBalance : DetectInitialBalance();
       if(m_initial<=0)
@@ -181,6 +285,9 @@ public:
       m_tradesToday=entries;
       m_requestsToday=0;
       m_dailyStopTripped=false;
+      m_lossCheckedAt=0;
+      m_lastLossAt=0;
+      m_lossStreak=0;
      }
 
    bool              IsNewDay(void)            { return ClockPragueDayStart()!=m_dayKey; }
@@ -218,6 +325,19 @@ public:
    void              AddTrade(void)                { m_tradesToday++; }
    int               TradesToday(void)             { return m_tradesToday; }
    int               RequestsToday(void)           { return m_requestsToday; }
+   void              InvalidateLosses(void)         { m_lossCheckedAt=0; }
+   int               ConsecutiveLosses(void)        { RefreshLosses(); return m_lossStreak; }
+   string            LossReason(const int cooldownMinutes)
+     {
+      RefreshLosses();
+      if(!m_lossHistoryOk)
+         return "trade history unavailable: no new trades";
+      if(m_lossStreak>=2)
+         return "two consecutive losing trades today";
+      if(m_lastLossAt>0 && TimeTradeServer()-m_lastLossAt<cooldownMinutes*60)
+         return StringFormat("loss cooldown: wait %d minutes after the last losing trade",cooldownMinutes);
+      return "";
+     }
 
    // "" when the session allows new trades, otherwise the reason it doesn't.
    string            SessionReason(void)

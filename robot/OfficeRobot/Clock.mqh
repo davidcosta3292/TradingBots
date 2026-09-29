@@ -60,6 +60,36 @@ datetime ClockUtcToPrague(const datetime utc)
    return utc+(summer ? 7200 : 3600);
   }
 
+// US Eastern daylight saving: second Sunday in March at 07:00 UTC until
+// the first Sunday in November at 06:00 UTC. Entry hours are NY wall time.
+datetime ClockNthSundayUtc(const int year,const int month,const int nth,const int hour)
+  {
+   MqlDateTime t;
+   ZeroMemory(t);
+   t.year=year;
+   t.mon=month;
+   t.day=1;
+   t.hour=hour;
+   datetime first=StructToTime(t);
+   MqlDateTime x;
+   TimeToStruct(first,x);
+   return first+((7-x.day_of_week)%7+(nth-1)*7)*86400;
+  }
+
+datetime ClockUtcToNewYork(const datetime utc)
+  {
+   MqlDateTime t;
+   TimeToStruct(utc,t);
+   bool summer=(utc>=ClockNthSundayUtc(t.year,3,2,7)
+                && utc<ClockNthSundayUtc(t.year,11,1,6));
+   return utc+(summer ? -4*3600 : -5*3600);
+  }
+
+datetime ClockNewYork(void)
+  {
+   return ClockUtcToNewYork(ClockGmt());
+  }
+
 datetime ClockPrague(void)
   {
    return ClockUtcToPrague(ClockGmt());

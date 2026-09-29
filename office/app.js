@@ -621,6 +621,11 @@ function card(r) {
 
     <p class="seen">${seenText(r, online)}</p>
     ${s.exercise_mode ? `<p class="exercise-note"><b>Demo exercise</b> · EMA bias on closed M1 bars · timed exit after ${esc(s.exercise_hold_minutes ?? 3)} min or stop/target · ${esc(s.risk_pct ?? 0.05)}% risk per entry. This is an execution check, not a validated strategy.</p>` : ''}
+    ${s.signal_check ? `<div class="plan-note"><b>XAUUSD plan draft · demo</b>
+      <span>${esc(s.trends || 'Waiting for trend data')}</span>
+      <span>${esc(s.signal_check)}</span>
+      <small>Up to ${esc(s.risk_pct ?? 0.1)}% risk · ${esc(s.target_r ?? 3)}R target · ${esc(s.max_hold_hours ?? 6)}h maximum hold · ${esc(s.loss_streak ?? 0)} losses in a row</small>
+    </div>` : ''}
 
     ${positions.length
       ? positions.map((p) => positionRow(p, r, currency)).join('')
@@ -823,7 +828,10 @@ function loadDemo() {
   store.me = { id: 'me' };
   store.members.set('me', 'David').set('friend', 'Friend');
   const base = {
-    currency: 'USD', timeframe: 'M15', strategy: 'EMA 20/50 cross, ATR(14) stop', initial: 25000,
+    currency: 'USD', timeframe: 'M15', strategy: 'XAUUSD plan draft v1: H4/D1/H1 trend, M15 BOS-pullback', initial: 25000,
+    risk_pct: 0.1, target_r: 3, max_hold_hours: 6, loss_streak: 0,
+    trends: 'D1 up / H4 up / H1 up / M15 up',
+    signal_check: 'BUY: structure break, zone retest, reaction, confirmation',
     ftmo_daily_floor: 23750, robot_daily_stop: 24000, ftmo_max_floor: 22500, robot_max_stop: 23000,
   };
   store.robots.set('r1', {

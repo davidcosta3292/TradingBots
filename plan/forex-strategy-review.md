@@ -7,37 +7,33 @@ Source: the two-page `forex.pdf` supplied on 29 Sep 2026. It describes a discret
 | Area | Rule in the PDF | Robot translation |
 | --- | --- | --- |
 | Instrument | Almost exclusively XAUUSD | Require the broker's gold symbol for this strategy mode; do not silently trade another chart. |
-| Direction | Follow the larger Daily/4H trend | A measurable trend definition is needed. EMA alignment is listed as an optional STRONG item, so it should not silently become the entire CORE trend rule. |
-| Entry gate | All five CORE items: 4H direction, break of structure (BOS), pullback to a relevant zone, visible reaction, 15M confirmation | No order until all five are true on *closed* candles. BOS, zone, reaction, and 15M confirmation need exact definitions and timeframes. |
-| Extra confluence | At least three STRONG items and one entry-candle price-action item for a full setup | Score independently defined conditions. The document permits a weaker setup with reduced size or no trade; defaulting to **no trade** is the clearer first version. |
+| Direction | Follow the larger Daily/4H trend | Draft v1 uses a closed 4H EMA 50/200 trend, checks Daily and 1H EMA 20/50, and requires closed 15M EMA 20/50 alignment. This is our measurable substitute for the discretionary trend reading. |
+| Entry gate | All five CORE items: 4H direction, break of structure (BOS), pullback to a relevant zone, visible reaction, 15M confirmation | Draft v1 implements all five with the rules below, using completed 15M candles. |
+| Extra confluence | At least three STRONG items and one entry-candle price-action item for a full setup | Draft v1 does **not** claim to implement the PDF's STRONG score. It uses Daily/1H alignment for full or half risk; this is our demo choice. |
 | DXY | Check correlation before entering; confirmation, not a stand-alone signal | Optional only after the broker's DXY symbol and a measurable correlation window are agreed. Missing DXY data must be visible, not silently treated as confirmation. |
-| Trade size | At most 1.0 lot | Cap size at 1.0 lot *after* risk-based sizing. The PDF gives no account-risk percentage. |
-| Stop and target | Stop set before entry, never moved against the trade; reward/risk at least 2:1, target 3:1, at most 4:1 | The robot already submits an initial stop and target with orders. Exact stop placement and when 2R versus 3R versus 4R applies remain open. |
-| Frequency | Aim for no more than five trades a day; a later line says never exceed 8-10, while the pre-entry checklist says stop after more than five | Use **five as the proposed hard cap**, pending owner confirmation. Count filled entries, not rejected order attempts. |
-| Losing streak | Wait 20-30 minutes after one loss; stop for the day after two consecutive losses | Propose a 30-minute cooldown and `DONE_TODAY` after two net-losing closed positions. Count position outcomes rather than individual partial-fill deals. |
-| Hours | 08:00-13:00 New York; 08:00-10:00 and 12:00-13:00 are called sweet spots; avoid 09:00 and 11:00 | Use actual New York wall time with daylight saving. Exact excluded intervals need confirmation; “avoid 09:00” may mean one hour or only a news moment. The PDF's winter-shift note needs clarification: 08:00 New York local time stays 08:00 locally, while its offset from the broker/Prague clock changes. |
+| Trade size | At most 1.0 lot | Draft v1 risks 0.10% of initial account balance on full alignment or 0.05% with one supporting trend. It caps broker volume at 1.0 lot. The PDF gives no account-risk percentage. |
+| Stop and target | Stop set before entry, never moved against the trade; reward/risk at least 2:1, target 3:1, at most 4:1 | Draft v1 places the stop beyond the reaction/confirmation candles with an ATR buffer, at least 1.2 ATR from signal close, rejects an entry if the stop exceeds 4 ATR from execution, and submits a 3R target to the broker. |
+| Frequency | Aim for no more than five trades a day; a later line says never exceed 8-10, while the pre-entry checklist says stop after more than five | Draft v1 caps at five filled entry deals per Prague day. |
+| Losing streak | Wait 20-30 minutes after one loss; stop for the day after two consecutive losses | Draft v1 waits 30 minutes after a net-losing closed position and goes `DONE_TODAY` after two consecutive net-losing closed positions in the Prague day. |
+| Hours | 08:00-13:00 New York; 08:00-10:00 and 12:00-13:00 are called sweet spots; avoid 09:00 and 11:00 | Draft v1 allows new entries 08:00-09:00, 10:00-11:00, and 12:00-13:00 New York wall time. It handles US daylight saving. Excluding the full 09 and 11 hours is our interpretation. |
 | News | Avoid NFP and other high-impact releases | The current EA checks MT5's high-impact calendar and pauses entries from 15 minutes before to 15 after. The PDF does not set a blackout duration, so this interval is an existing project setting, not a rule from the PDF. |
-| Duration | Avoid scalps under 15 minutes; target 1-6 hours | Build signals on 15M and higher bars and consider a six-hour time exit. Do **not** suppress a protective stop or target to force a position to last 15 minutes. |
+| Duration | Avoid scalps under 15 minutes; target 1-6 hours | Draft v1 uses 15M closed-bar entries and closes after six hours if still open. Broker stop/target can close earlier; the EA time exit needs MetaTrader running. |
 | Day patterns | Friday was best; Tuesday was weak; Sunday open requires care | Treat these as observations, not automatic position-size boosts or bans, unless supported by the underlying trade log and an explicit rule. |
 | Human checklist | Read plan, review trades, rested and calm | Display a pre-session checklist for a person; software cannot verify rest, stress, or conviction. |
 
-## Entry definitions needed before coding the real strategy
+## The draft's exact signal
 
-The PDF names the five CORE checks, but gives no formulas or marked charts. These choices determine which trades the robot takes:
+These are choices made for demo observation on 29 Sep 2026, with the owner's permission to use our own definitions. They are **not** verbatim formulas from the PDF.
 
-1. **4H direction:** which swing highs/lows or other measure defines an uptrend or downtrend? How many confirmed candles are required?
-2. **BOS:** which timeframe; wick or candle close; which prior swing; minimum break distance; and how long does a BOS remain valid?
-3. **Relevant zone and pullback:** how is the zone drawn (broken swing, supply/demand, order block, support/resistance)? How close must price return, and how long can it take?
-4. **Visible reaction and 15M confirmation:** which candle pattern qualifies; does the next 15M candle have to close beyond the reaction candle?
-5. **STRONG score:** exact tests for liquidity sweep, support/resistance, previous-day high/low, and EMA 50/200; whether overlapping tests can count twice.
-6. **Stop, target, and size:** structural stop or ATR stop; which market condition selects 2R, 3R, or 4R; percentage of initial account balance risked per entry, in addition to the one-lot cap.
-7. **Time and news:** exact excluded portions of 09:00 and 11:00 New York, and the NFP/high-impact blackout duration.
+1. **Trend:** 4H closed candle above EMA 50, with EMA 50 above EMA 200, for a buy; invert for a sell. The closed 15M EMA 20/50 trend must agree, and at least one of Daily or 1H EMA 20/50 must agree. Both supporting trends agreeing gives full risk; one gives half risk.
+2. **BOS:** a completed 15M candle 3-12 bars ago closed at least 0.05 ATR beyond the prior six-bar high/low. Intermediate closes cannot cross back more than 0.70 ATR.
+3. **Zone:** the next-to-last completed 15M candle touches the broken level within 0.35 ATR (and may cross it by at most 0.55 ATR), or touches EMA 20 within a similar buffer, then closes on the trend side.
+4. **Reaction:** that candle has a directional body at least 25% of its range, closes in the favorable 35% of its range, and shows either a rejection wick of at least 0.10 ATR or a body of at least 0.35 ATR.
+5. **Confirmation:** the most recent completed 15M candle moves in trend direction, closes beyond the reaction candle's high/low, and remains beyond EMA 20. The robot can enter at the next 15M bar if all account, session, calendar and risk guards allow it.
+6. **Exit:** broker stop and 3R target are placed with the order. The EA also tries to close any remaining position after six hours. There is no three-minute exercise timer and no forced 15-minute minimum.
 
-Three winning and three losing trades marked on charts, with entry, stop, exit and why each CORE/STRONG item passed, would let us compare the robot's signals to the trader's actual decisions. Without that, numerical rules would be a new strategy inspired by this plan, not the same strategy.
+The PDF's STRONG score, DXY check, marked support/resistance and discretionary quality judgment are not implemented. Six marked examples, including losses, would help calibrate this interpretation. Neither the PDF's stated performance nor this draft's profitability has been verified.
 
-## Proposed rollout
+## Rollout
 
-1. Keep the current **demo exercise** running unchanged for execution checks. Its M1 EMA bias and three-minute exit contradict this PDF and are not the new strategy.
-2. Agree on the definitions above, then implement a separate **XAUUSD plan** mode that is off by default. Reuse the existing office controls, Telegram trade reports, news watch, FTMO limits and demo-only gate.
-3. Compare signals against the six marked example trades; inspect entries and exits in the MT5 Strategy Tester and a demo account. Only then replace the exercise on a running chart. Attaching an updated EA restarts it paused.
-4. Apply the strategy to Jhonatan's Trader only when his own account and robot are activated. The Risk Management office slot is still a role label, not a connected risk service.
+Robot 01's previous EMA exercise should remain paused until the compiled v1.2 EA has been installed and reattached. The new EA starts paused; David can then press Start in the office for demo operation. Jhonatan's separate Trader remains for later activation. The Risk Management office slot is still a label, not a connected risk service.

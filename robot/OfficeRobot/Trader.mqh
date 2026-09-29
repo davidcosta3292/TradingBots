@@ -111,8 +111,9 @@ public:
 
    // Opens one trade sized so that hitting the stop loses riskMoney.
    // sent is true when an order actually went to the server.
-   bool              Open(const int direction,const double stopDistance,const double targetR,
-                          const double riskMoney,const string comment,string &info,bool &sent)
+   bool              Open(const int direction,const double stopPrice,const double maxStopDistance,
+                          const double targetR,const double riskMoney,const double maxAllowedLots,
+                          const string comment,string &info,bool &sent)
      {
       sent=false;
       MqlTick tick;
@@ -124,16 +125,22 @@ public:
       int digits=(int)SymbolInfoInteger(m_symbol,SYMBOL_DIGITS);
       double point=SymbolInfoDouble(m_symbol,SYMBOL_POINT);
       double minStop=(double)SymbolInfoInteger(m_symbol,SYMBOL_TRADE_STOPS_LEVEL)*point;
-      if(stopDistance<=0 || stopDistance<minStop)
-        {
-         info="stop would be too close to the price";
-         return false;
-        }
 
       bool buy=direction>0;
       ENUM_ORDER_TYPE type=buy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
       double entry=buy ? tick.ask : tick.bid;
-      double sl=NormalizeDouble(buy ? entry-stopDistance : entry+stopDistance,digits);
+      double stopDistance=buy ? entry-stopPrice : stopPrice-entry;
+      if(stopDistance<=0 || stopDistance>maxStopDistance)
+        {
+         info="price moved too far from the planned structural stop";
+         return false;
+        }
+      if(stopDistance<minStop+2*point)
+        {
+         info="stop would be too close to the price";
+         return false;
+        }
+      double sl=NormalizeDouble(stopPrice,digits);
       double tp=NormalizeDouble(buy ? entry+stopDistance*targetR : entry-stopDistance*targetR,digits);
 
       // What one lot would lose at the stop, in account currency.
@@ -152,7 +159,13 @@ public:
          info=StringFormat("the risk per trade is too small for the minimum size (%.2f lots)",minLots);
          return false;
         }
-      lots=MathMin(lots,maxLots);
+      lots=MathMin(lots,MathMin(maxLots,maxAllowedLots));
+      lots=MathFloor(lots/step)*step;
+      if(lots<minLots)
+        {
+         info="lot cap is below the broker's minimum size";
+         return false;
+        }
       int volumeDigits=(int)MathMax(0,MathRound(-MathLog10(step)));
       lots=NormalizeDouble(lots,volumeDigits);
 
