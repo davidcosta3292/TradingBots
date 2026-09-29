@@ -9,7 +9,7 @@
 //|    Start in the office.                                          |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "1.21"
+#property version     "1.22"
 #property description "Trading Office robot: XAUUSD plan draft, demo only, FTMO guards, office controls."
 
 #include "Clock.mqh"
@@ -19,7 +19,7 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.2.1"
+#define ROBOT_VERSION "1.2.2"
 // Our office. Used whenever the URL or key input is left empty.
 #define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
 #define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
@@ -214,8 +214,12 @@ void RefreshBlocks(void)
       AddBlock("Algo Trading is switched off in MetaTrader");
    if(AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
       AddBlock("not a demo account (this version cannot trade live)");
-   if(SymbolInfoString(_Symbol,SYMBOL_CURRENCY_BASE)!="XAU"
-      || SymbolInfoString(_Symbol,SYMBOL_CURRENCY_PROFIT)!="USD")
+   string symbolName=_Symbol;
+   StringToUpper(symbolName);
+   bool goldDollarName=StringFind(symbolName,"XAUUSD")==0;
+   bool goldDollarMetadata=SymbolInfoString(_Symbol,SYMBOL_CURRENCY_BASE)=="XAU"
+                           && SymbolInfoString(_Symbol,SYMBOL_CURRENCY_PROFIT)=="USD";
+   if(!goldDollarName && !goldDollarMetadata)
       AddBlock("this strategy only trades gold quoted in USD (XAUUSD)");
    if(g_maxStopTripped)
       AddBlock("max-loss stop reached");
