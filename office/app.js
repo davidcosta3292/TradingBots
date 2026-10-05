@@ -255,8 +255,9 @@ async function loadAll() {
 
 function subscribe() {
   sb.channel('office')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'robots' }, ({ new: row }) => {
-      if (row?.id) store.robots.set(row.id, row);
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'robots' }, (change) => {
+      if (change.eventType === 'DELETE' && change.old?.id) forgetRobot(change.old.id);
+      else if (change.new?.id) store.robots.set(change.new.id, change.new);
       render();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'commands' }, ({ new: row }) => {
@@ -426,6 +427,9 @@ async function onClick(event) {
   const lookButton = target.closest('button[data-look]');
   if (lookButton) return changeLook(lookButton.dataset.robot, lookButton.dataset.look, lookButton.dataset.value);
 
+  const deleteButton = target.closest('button[data-delete-robot]');
+  if (deleteButton && !deleteButton.disabled) return deleteRobot(deleteButton.dataset.deleteRobot);
+
   const button = target.closest('button[data-cmd]');
   if (!button || button.disabled) return;
   const robot = store.robots.get(button.dataset.robot);
@@ -500,6 +504,55 @@ async function changeLook(robotId, field, value) {
   }
   robot.look = look;
   render();
+}
+
+function forgetRobot(id) {
+  store.robots.delete(id);
+  store.lastCommand.delete(id);
+  store.events.delete(id);
+  store.deals.delete(id);
+  openLooks.delete(id);
+  if (selectedId === id) selectedId = null;
+  if (newRobotToken?.id === id) newRobotToken = null;
+}
+
+async function deleteRobot(id) {
+  const robot = store.robots.get(id);
+  if (!robot || robot.owner_id !== store.me?.id) return;
+  const reason = deleteBlock(robot);
+  if (reason) return toast(reason);
+  const warning = isAnalyst(robot) && robot.last_report_at
+    ? 'Its Supabase news schedule will stop. Its reports and news history will be erased.'
+    : 'Its token, commands, trades and office history will be erased. This cannot be undone.';
+  if (prompt(`Delete ${robot.name}?\n\n${warning}\n\nType the robot name to confirm:`) !== robot.name) return;
+  if (!DEMO) {
+    const { error } = await sb.rpc('delete_my_robot', { p_robot: id });
+    if (error) return toast(`Could not delete ${robot.name}: ${error.message}`);
+  }
+  forgetRobot(id);
+  render();
+  toast(`${robot.name} deleted from the office.`);
+}
+
+function deleteBlock(robot) {
+  if (!isTrader(robot) || !robot.last_report_at) return '';
+  if (robot.state !== 'paused') return 'Pause this Trader and wait for confirmation before deleting it.';
+  const positions = robot.status?.positions;
+  if (!Array.isArray(positions)) return 'Wait for the Trader to report its open positions.';
+  if (positions.length) return 'Close its open positions and confirm the account is flat first.';
+  if (Date.now() - Date.parse(robot.last_report_at) < 120_000)
+    return 'Remove the EA from the MetaTrader chart, then wait two minutes for it to go offline.';
+  return '';
+}
+
+function deleteControl(robot) {
+  const blocked = deleteBlock(robot);
+  const note = blocked || (isAnalyst(robot) && robot.last_report_at
+    ? 'Deleting this Analyst also stops its Supabase news schedule.'
+    : 'Deletes this robot and its office history permanently.');
+  return `<div class="delete-control">
+    <button type="button" data-delete-robot="${robot.id}"${blocked ? ' disabled' : ''}>Delete robot</button>
+    <small>${esc(note)}</small></div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +661,7 @@ function card(r) {
       <span class="pill planned">Planned</span></header>
     <div class="assignment-note"><b>${esc(assignment.label)} is an assignment, not a running agent yet.</b>
       <p>No risk, coordination, or analysis program is connected. It does not watch accounts, send alerts, or place trades. Trader EAs enforce their own FTMO limits.</p></div>
-    ${mine ? assignmentPicker(r) + lookPicker(r) : ''}
+    ${mine ? assignmentPicker(r) + lookPicker(r) + deleteControl(r) : ''}
   </article>`;
   const positions = Array.isArray(s.positions) ? s.positions : [];
   const blocks = Array.isArray(s.blocks) ? s.blocks : [];
@@ -663,7 +716,7 @@ function card(r) {
 
     ${tradeHistory(r, currency)}
     ${mine ? assignmentPicker(r) : ''}
-    ${mine ? lookPicker(r) : ''}
+    ${mine ? lookPicker(r) + deleteControl(r) : ''}
 
     ${events.length ? `<ol class="feed">${events.slice(0, 5).map((e) =>
       `<li><time>${clock(e.at)}</time>${esc(e.message)}</li>`).join('')}</ol>` : ''}
@@ -709,7 +762,7 @@ function analystCard(r, mood, owner, mine) {
       ${headlines.length ? `<ol>${headlines.slice(0, 8).map((item) => newsRow(item)).join('')}</ol>`
         : `<p>${r.last_report_at ? 'No matching headlines in the recent feeds.' : 'Waiting for the first scan.'}</p>`}</section>
     <p class="viewonly">Relevance is a keyword filter, not a prediction. Read the linked source before making decisions.</p>
-    ${mine ? assignmentPicker(r) + lookPicker(r) : ''}
+    ${mine ? assignmentPicker(r) + lookPicker(r) + deleteControl(r) : ''}
     ${events.length ? `<ol class="feed">${events.slice(0, 5).map((e) =>
       `<li><time>${clock(e.at)}</time>${esc(e.message)}</li>`).join('')}</ol>` : ''}
   </article>`;

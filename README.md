@@ -23,7 +23,7 @@ Supabase Edge Function     ──news reports─►    ▲
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run migrations `0001` to `0010` in order. Migration `0011` schedules this project's Analyst function and requires its Vault token first; its URL and public key must be changed for another Supabase project.
+2. **SQL Editor:** run migrations `0001` to `0010` in order, then `0012` for owner-controlled deletion. Migration `0011` schedules this project's Analyst function and requires its Vault token first; its URL and public key must be changed for another Supabase project.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in. An office member can create up to six slots from the hosted page; administrators can also use the helpers below:
@@ -97,6 +97,8 @@ For another Analyst, use **+ Add robot → Fundamental Analyst** in the office a
 
 Robots say what they just did in a speech bubble. The right-hand monitor on each desk takes turns between the FTMO limits and the last 7 days of trades. **Tour** flies the camera from robot to robot, **Legend** explains the places, and **Sound** turns on small sounds for trades and button presses. Each robot's owner can change its colour and gear under **Look in the office** in its card.
 
+An owner can also choose **Delete robot** at the bottom of its card. This erases the robot's office token, commands, trades, events and news history. A connected Trader must first be paused, have no open positions, and be removed from the MetaTrader chart for two minutes. Deleting the scheduled Fundamental Analyst also stops its Supabase cron job and removes the matching Vault token. Other members cannot delete your robots.
+
 ### 4. The robot (each of us, on our own PC and FTMO account)
 
 1. **FTMO:** start a Free Trial (2-Step, MetaTrader 5), install FTMO's MetaTrader 5, and log in with the trial's login.
@@ -107,7 +109,7 @@ Robots say what they just did in a speech bubble. The right-hand monitor on each
 4. **Attach it:** open an **XAUUSD** chart and drag **OfficeRobot** onto it from *Navigator → Expert Advisors*. Then, under **Inputs**:
    - `Supabase project URL`, `Supabase publishable key`, and your own robot's token;
    - `Magic number`: **101** for Robot 01, **102** for Robot 02.
-5. Switch on **Algo Trading** in the MetaTrader toolbar. The chart shows `PAUSED | office link: ok`, and the robot appears in the office. Press **Start** there. After an update, remove and reattach the EA so its new Inputs load; it starts paused again.
+5. Switch on **Algo Trading** in the MetaTrader toolbar. The chart shows `PAUSED | office link: ok`, and the robot appears in the office. Press **Start** there. After an update, remove and reattach the EA so its new Inputs load; it starts paused again. With version 1.2.3, changing only the chart timeframe preserves the robot's current Start/Pause/Done state.
 
 **On a Mac:** download [OfficeRobot-source.zip](https://trading-office-puce.vercel.app/downloads/OfficeRobot-source.zip) directly from the office site. Unzip it. In MetaTrader 5 choose **File → Open Data Folder**, then copy the entire `OfficeRobot` folder to `MQL5/Experts`. Open `OfficeRobot.mq5` in MetaEditor and press F7 to compile. Add the Supabase URL to allowed WebRequest URLs, attach the Trader EA to your own FTMO demo chart, set a unique magic number, paste your own token, and turn on Algo Trading. The Windows `install.ps1` script does not run on macOS. After editing robot source, regenerate the download with `tools/package-robot.ps1` before deploying. Keep one active Trader EA per FTMO account until a shared account-level risk budget exists.
 
@@ -122,7 +124,7 @@ Robots say what they just did in a speech bubble. The right-hand monitor on each
 
 - Only a robot's owner sees its buttons. FTMO allows nobody else to use an account.
 - The robot confirms every press. A press it doesn't pick up within 60 seconds expires.
-- **A robot always starts paused.** That includes after a restart, a MetaTrader restart, or a settings change.
+- **A fresh attachment starts paused.** MetaTrader restarts the EA when you change a chart timeframe; version 1.2.3 restores its current state for that specific chart change. A terminal restart, recompile, EA removal, account change or settings change still starts it paused.
 - Keep the PC awake while the robot runs: turn off sleep, and keep MetaTrader open. A locked screen is fine.
 
 ## FTMO 2-Step rules the robot enforces
@@ -142,6 +144,6 @@ The broker-side stop and target remain in place even if MetaTrader disconnects. 
 
 **XAUUSD plan draft v1** replaces the M1 EMA exercise. On completed candles, the EA reads the 4H direction, checks Daily, 1H and 15M trend alignment, then looks for a 15M structure break, pullback, reaction and confirmation. It submits a structural stop and a 3R broker target; there is no three-minute rule. Full alignment risks up to 0.10% of the initial balance, and one supporting trend risks up to 0.05%, with a 1.0-lot cap. It permits at most five plan entries per Prague day, waits 30 minutes after a losing plan position, and stops for that day after two plan losses in a row. Trades from the retired three-minute exercise do not count toward those plan-specific limits; their P&L still counts toward account-wide FTMO limits. New entries are limited to 08:00-09:00, 10:00-11:00 and 12:00-13:00 New York time, plus existing market/news/FTMO guards. An open trade can reach its stop or target outside those entry windows. It will only open a new trade after its owner presses Start.
 
-The [strategy review](plan/forex-strategy-review.md) gives the exact definitions and differences from the supplied discretionary PDF. This draft is for observing execution in demo; no profitability has been established. After replacing the EA, check that the chart reports version **1.2.2** and the robot is **Paused**, then press Start. The strategy lives in `robot/OfficeRobot/Strategy.mqh`, apart from the buttons and account risk guards.
+The [strategy review](plan/forex-strategy-review.md) gives the exact definitions and differences from the supplied discretionary PDF. This draft is for observing execution in demo; no profitability has been established. After replacing the EA, check that the chart reports version **1.2.3** and the robot is **Paused**, then press Start. The strategy lives in `robot/OfficeRobot/Strategy.mqh`, apart from the buttons and account risk guards.
 
 Telegram already receives confirmed controls and trade events. At 20:00 Prague, on days a Trader reported, it also sends a generic check-in linking to the signed-in office. Detailed balances and P&L stay in the office. The EA's MT5 news guard alerts Telegram as a high-impact event approaches and when its entry pause begins or ends. The separate Fundamental Analyst now watches external headlines and the Forex Factory calendar and posts read-only observations; see [the news-agent plan](plan/news-agent.md).

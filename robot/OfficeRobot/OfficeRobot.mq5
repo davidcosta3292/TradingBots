@@ -5,11 +5,10 @@
 //|  - Enforces the FTMO 2-Step rules itself (see Guards.mqh).       |
 //|  - Obeys Start / Pause / Done for today / Close everything from  |
 //|    the office and confirms every command.                        |
-//|  - Always starts paused. Nothing trades until someone presses    |
-//|    Start in the office.                                          |
+//|  - Starts paused, except for a same-chart timeframe change.      |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "1.22"
+#property version     "1.23"
 #property description "Trading Office robot: XAUUSD plan draft, demo only, FTMO guards, office controls."
 
 #include "Clock.mqh"
@@ -19,7 +18,7 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.2.2"
+#define ROBOT_VERSION "1.2.3"
 // Our office. Used whenever the URL or key input is left empty.
 #define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
 #define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
@@ -70,7 +69,7 @@ CPlanStrategy    g_strategy;
 COfficeTrader    g_trader;
 COfficeLink      g_link;
 
-ENUM_ROBOT_STATE g_state=STATE_PAUSED;     // robots always start paused
+ENUM_ROBOT_STATE g_state=STATE_PAUSED;     // a fresh attach always starts paused
 bool             g_maxStopTripped=false;
 datetime         g_lastBar=0;
 datetime         g_lastPoll=0;
@@ -83,6 +82,54 @@ string           g_lastUpcomingNews="";
 int              g_holdCloseFailures=0;
 datetime         g_lastHoldAttempt=0;
 long             g_doneIds[];              // commands already carried out
+
+// A chart-period switch reinitializes an EA. Carry its state through that
+// single restart, but never through a terminal restart, recompile or removal.
+string ResumeKey(void)
+  {
+   return "TO.R."+IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN))+"."
+          +IntegerToString(ChartID())+"."+IntegerToString(InpMagic);
+  }
+
+int SymbolStamp(void)
+  {
+   int stamp=0;
+   for(int i=0;i<StringLen(_Symbol);i++)
+      stamp=(stamp*31+(int)StringGetCharacter(_Symbol,i))%100000;
+   return stamp;
+  }
+
+void RememberChartState(void)
+  {
+   string key=ResumeKey();
+   // The temporary terminal variable disappears when MetaTrader exits.
+   if(!GlobalVariableTemp(key))
+     {
+      Print("[Office] Could not keep state across the timeframe change: ",GetLastError());
+      return;
+     }
+   double packed=(double)((long)TimeLocal()*1000000+(long)SymbolStamp()*10+(long)g_state);
+   if(GlobalVariableSet(key,packed)==0)
+      Print("[Office] Could not save the chart state: ",GetLastError());
+  }
+
+bool RestoreChartState(void)
+  {
+   string key=ResumeKey();
+   double packed=0;
+   if(!GlobalVariableGet(key,packed))
+      return false;
+   GlobalVariableDel(key);                    // one restart only
+   long value=(long)packed;
+   datetime saved=(datetime)(value/1000000);
+   long rest=value%1000000;
+   int state=(int)(rest%10);
+   if(TimeLocal()<saved || TimeLocal()-saved>60 || (int)(rest/10)!=SymbolStamp()
+      || state<STATE_PAUSED || state>STATE_DONE_TODAY)
+      return false;
+   g_state=(ENUM_ROBOT_STATE)state;
+   return true;
+  }
 
 //+------------------------------------------------------------------+
 //| Names                                                            |
@@ -680,8 +727,11 @@ int OnInit(void)
    g_link.Init(OrDefault(InpOfficeUrl,OFFICE_URL),OrDefault(InpOfficeKey,OFFICE_KEY),Cleaned(InpRobotToken));
 
    g_state=STATE_PAUSED;
+   bool resumed=false;
    if(MQLInfoInteger(MQL_TESTER))
       g_state=STATE_ACTIVE;                    // no office in the Strategy Tester
+   else
+      resumed=RestoreChartState();
    if(g_guards.MaxStopHit(AccountInfoDouble(ACCOUNT_EQUITY)))
      {
       g_maxStopTripped=true;
@@ -689,10 +739,12 @@ int OnInit(void)
      }
 
    QueueRecentDeals();
-   Event("started",StringFormat("Started %s on %s %s, account %s (%s), %s. Paused until you press Start.",
+   Event("started",StringFormat("Started %s on %s %s, account %s (%s), %s. %s",
                                 ROBOT_VERSION,_Symbol,"M15",
                                 IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)),TradeModeName(),
-                                "XAUUSD plan draft"));
+                                "XAUUSD plan draft",
+                                resumed ? "Chart timeframe changed; restored "+StateLabel()+"."
+                                        : "Paused until you press Start."));
    if(!g_link.Enabled() && !MQLInfoInteger(MQL_TESTER))
       Print("[Office] Office link off (",g_link.LastError(),"), so this robot can't receive Start and stays paused.");
 
@@ -706,7 +758,10 @@ int OnInit(void)
 void OnDeinit(const int reason)
   {
    EventKillTimer();
-   Event("stopped","Stopped: "+DeinitReasonText(reason));
+   if(reason==REASON_CHARTCHANGE)
+      RememberChartState();
+   else
+      Event("stopped","Stopped: "+DeinitReasonText(reason));
    string commands;
    g_link.Sync(BuildReport(),commands,2000);   // best effort
    g_strategy.Deinit();
