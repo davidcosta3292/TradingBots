@@ -43,8 +43,8 @@ function money(value, currency = 'USD', signed = false) {
 
 const toneColor = (n) => (n > 0 ? GREEN : n < 0 ? RED : INK);
 
-function pragueClock(date = new Date()) {
-  return date.toLocaleTimeString('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+function officeClock(timeZone, date = new Date()) {
+  return date.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' });
 }
 
 // ---------------------------------------------------------------------------
@@ -174,8 +174,8 @@ function buildRoom(scene) {
   logoPlane.rotation.y = Math.PI / 2;
   scene.add(logoPlane);
 
-  // World clocks on the left wall: FTMO's day runs on Prague time.
-  const cities = [['PRAGUE', 'Europe/Prague'], ['LONDON', 'Europe/London'], ['NEW YORK', 'America/New_York']];
+  // New York sets entry windows; FTMO's day runs on Prague time.
+  const cities = [['NEW YORK', 'America/New_York'], ['PRAGUE', 'Europe/Prague'], ['LONDON', 'Europe/London']];
   const clocks = cities.map(([name, zone], i) => {
     const tex = canvasTexture(320, 200);
     scene.add(box(0.06, 0.78, 1.18, material('#0A0C0F'), -w / 2 + 0.03, 2.75, -3.1 + i * 1.45));
@@ -1105,7 +1105,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     ctx.textAlign = 'right';
     ctx.fillStyle = MUTED;
     ctx.font = font(30, 400);
-    ctx.fillText(`Prague ${pragueClock()}`, W - 40, 62);
+    ctx.fillText(`New York ${officeClock('America/New_York')}`, W - 40, 62);
 
     // One row per robot on the right.
     robots.slice(0, 4).forEach((r, i) => {
@@ -1140,8 +1140,8 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     ctx.fillRect(0, 368, W, H - 368);
     if (latest) {
       const x = runs(ctx, 40, 418, [
-        ['LATEST  ', GOLD, font(26, 700)],
-        [`${pragueClock(new Date(latest.at))}  `, MUTED, font(28, 400)],
+        ['LATEST NY  ', GOLD, font(26, 700)],
+        [`${officeClock('America/New_York', new Date(latest.at))}  `, MUTED, font(28, 400)],
         [`${latest.name}  `, INK, font(28, 700)],
       ]);
       ctx.fillStyle = MUTED;

@@ -182,7 +182,7 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=12')
+  officeLoading ??= import('./scene.js?v=13')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
@@ -633,12 +633,13 @@ function summary(robots) {
   const moods = robots.map((r) => moodOf(r));
   const online = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned').length;
   const trading = moods.filter((m) => m.key !== 'offline' && m.key !== 'planned' && m.inTrade).length;
-  const prague = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  const clock = (timeZone) => now.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' });
   const on = soundOn();
   return `<span><b>${robots.length}</b> robots</span>
     <span><b>${online}</b> online</span>
     <span><b>${trading}</b> in a trade</span>
-    <span class="clock">Prague ${prague}</span>
+    <span class="clock"><b>New York ${clock('America/New_York')}</b><small title="FTMO daily reset follows Prague time">Prague ${clock('Europe/Prague')} · FTMO day</small></span>
     <button type="button" class="chip${on ? ' on' : ''}" data-sound aria-pressed="${on}" title="Sounds for trades and button presses">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>${on
         ? '<path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
