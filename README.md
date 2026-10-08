@@ -77,6 +77,8 @@ If an emailed Supabase invitation opens a 404 page, set Supabase Auth's **Site U
 
 The page has two views: **Office**, the 3D office, and **Cards**, the plain list that works best on a phone.
 
+The office has **Overview**, **Desks**, **Café** and **Lounge** camera shortcuts, a **Tour**, and a robot dock along the bottom for quick selection. **Evening light / Daylight** changes the room lighting and remembers your choice in that browser. Robot colours, eye colours and accessories are in the owner's **Look in the office** section. Camera movement is reduced when the device requests reduced motion.
+
 In the office, where a robot is tells you what it's doing:
 
 | Where | What it means |

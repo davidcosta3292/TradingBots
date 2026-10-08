@@ -10,6 +10,7 @@ import { play, setSound, soundOn } from './sounds.js?v=5';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const VIEW_KEY = 'trading-office-view';
+const LIGHTING_KEY = 'trading-office-lighting';
 const HISTORY_DAYS = 7;
 
 const BUTTONS = [
@@ -52,6 +53,8 @@ let office = null;        // the 3D scene, loaded on first use
 let officeLoading = null;
 let newRobotToken = null;  // shown only in this browser until the page closes
 let setupOpen = false;
+let lightingMode = 'day';
+try { lightingMode = localStorage.getItem(LIGHTING_KEY) === 'evening' ? 'evening' : 'day'; } catch { /* private window */ }
 const htmlCache = new WeakMap();
 const openLooks = new Set(); // robots whose look picker is open
 
@@ -66,6 +69,8 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
 async function main() {
   document.addEventListener('click', onClick);
   document.addEventListener('change', onChange);
+  window.addEventListener('resize', sizeOfficeView);
+  document.addEventListener('visibilitychange', () => office?.setActive(view === 'office' && !document.hidden));
   $('setup').addEventListener('submit', createMyRobot);
   $('legend').innerHTML = `<h3>Who is where</h3><ul>${LEGEND.map(([key, place, meaning]) =>
     `<li><i style="background:${MOODS[key].color}"></i><span><b>${place}</b> ${esc(meaning)}</span></li>`).join('')}</ul>`;
@@ -172,7 +177,7 @@ function setView(next) {
   if (view === 'office') {
     loadOffice().then((scene) => {
       if (!scene) return;
-      scene.setActive(view === 'office');
+      scene.setActive(view === 'office' && !document.hidden);
       render();
     });
   } else {
@@ -182,10 +187,15 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=13')
+  officeLoading ??= import('./scene.js?v=14')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
+        onCamera: (name) => document.querySelectorAll('[data-home], [data-zone]').forEach((button) => {
+          const active = (button.dataset.zone || 'overview') === name;
+          button.classList.toggle('on', active);
+          button.setAttribute('aria-pressed', String(active));
+        }),
         onTour: (on) => {
           const button = document.querySelector('[data-tour]');
           button.classList.toggle('on', on);
@@ -194,6 +204,8 @@ function loadOffice() {
         },
         getInsets: panelInsets,
       });
+      office.lighting(lightingMode);
+      renderLighting();
       return office;
     })
     .catch((error) => {
@@ -210,6 +222,20 @@ function select(id) {
   if (id) office?.focus(id);
   else if (was) office?.home();
   render();
+}
+
+function sizeOfficeView() {
+  if (view !== 'office') return;
+  const area = $('scene-view');
+  area.style.height = `${Math.max(420, window.innerHeight - area.getBoundingClientRect().top - 16)}px`;
+}
+
+function renderLighting() {
+  const button = document.querySelector('[data-lighting]');
+  const evening = lightingMode === 'evening';
+  button.classList.toggle('on', evening);
+  button.setAttribute('aria-pressed', String(evening));
+  button.textContent = evening ? 'Daylight' : 'Evening light';
 }
 
 // How much of the office the open card covers, so the camera can keep the
@@ -393,6 +419,20 @@ async function onClick(event) {
   if (target.closest('[data-signout]')) return sb?.auth.signOut();
   if (target.closest('[data-retry-load]')) return location.reload();
   if (target.closest('[data-close-panel]')) return select(null);
+  const robotLink = target.closest('[data-select-robot]');
+  if (robotLink) return select(robotLink.dataset.selectRobot);
+  const zoneButton = target.closest('[data-zone]');
+  if (zoneButton) {
+    selectedId = null;
+    office?.zone(zoneButton.dataset.zone);
+    return render();
+  }
+  if (target.closest('[data-lighting]')) {
+    lightingMode = lightingMode === 'day' ? 'evening' : 'day';
+    try { localStorage.setItem(LIGHTING_KEY, lightingMode); } catch { /* private window */ }
+    office?.lighting(lightingMode);
+    return renderLighting();
+  }
 
   if (target.closest('[data-sound]')) {
     setSound(!soundOn());
@@ -582,11 +622,18 @@ function render() {
   }
 
   const robot = selectedId && store.robots.get(selectedId);
+  $('scene-view').classList.toggle('has-selection', !!robot);
+  setHTML($('team-dock'), robots.map((r, index) => {
+    const mood = moodOf(r, Date.now());
+    const look = lookOf(r, index);
+    return `<button type="button" data-select-robot="${esc(r.id)}" aria-pressed="${r.id === selectedId}" title="${esc(mood.label)}"><span class="robot-avatar" style="--robot-color:${look.color};--eye-color:${look.eyes}"><i></i><i></i></span><span><b>${esc(r.name)}</b><small style="color:${MOODS[mood.key].color}">${esc(mood.label)}</small></span></button>`;
+  }).join(''));
   $('panel').hidden = !robot;
   if (robot) {
     setHTML($('panel'), `<button class="panel-close" data-close-panel aria-label="Close">✕</button>${card(robot)}`);
   }
   office?.update({ robots, selected: selectedId, history: historyOf, latest: latestEvent() });
+  sizeOfficeView();
 }
 
 function renderSetup(robots) {

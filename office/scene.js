@@ -9,10 +9,11 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { MOODS, moodOf } from './moods.js?v=11';
 import { lookOf } from './looks.js?v=8';
 import { assignmentOf } from './assignments.js?v=12';
+import { furnishOffice } from './decor.js?v=1';
 
 const ROOM = { w: 25, d: 18, h: 4.6 };
 const CORRIDOR_X = -2.8;
-const WALK_SPEED = 2.6;
+const WALK_SPEED = 3.1;
 const GOLD = '#E3A82B';
 const GREEN = '#3DDC84';
 const RED = '#F06A5F';
@@ -20,13 +21,19 @@ const INK = '#EDEBE6';
 const MUTED = '#8F96A2';
 const OFFLINE_BODY = new THREE.Color('#5A5F68');
 // Three generous rows of four, with a clear aisle to the lounge and coffee.
-const DESK_SLOTS = [-5.8, -0.8, 4.2].flatMap((z) => [0, 3.3, 6.6, 9.9].map((x) => ({ x, z })));
+const DESK_SLOTS = [[0, 3.3], [6.6, 9.9]].flatMap((columns) =>
+  [-5.8, -0.8, 4.2].flatMap((z) => columns.map((x) => ({ x, z }))));
 // One sofa seat per robot, so nobody shuffles over when another sits down.
 const LOUNGE_SEATS = [3.25, 6.6, 7.75].flatMap((z) => [-10.4, -8.8, -7.2, -5.6].map((x) => ({ x, z })));
 // Standing room at the coffee bar, for robots waiting for their trading hours.
-const COFFEE_SPOTS = [-10.2, -8.9, -7.6, -6.3].map((x) => ({ x, z: -3.1 }));
+const COFFEE_SPOTS = [-4.2, -2.8, -1.4].flatMap((z) => [-10.2, -8.9, -7.6, -6.3].map((x) => ({ x, z })));
 // The starting view, which "Overview" flies back to.
-const HOME = { target: new THREE.Vector3(0, 0.8, 0), offset: new THREE.Vector3(30, 26, 30), zoom: 1 };
+const HOME = { target: new THREE.Vector3(0, 1.65, 0), offset: new THREE.Vector3(30, 26, 30), zoom: .86 };
+const ZONES = {
+  desks: { target: new THREE.Vector3(4, .9, -.8), zoom: 1.45 },
+  coffee: { target: new THREE.Vector3(-8, 1, -4.7), zoom: 2.2 },
+  lounge: { target: new THREE.Vector3(-8, .9, 4.8), zoom: 2.1 },
+};
 const TOUR_STOP_MS = 7000;
 const BUBBLE_MS = 6000;
 
@@ -207,58 +214,8 @@ function buildRoom(scene) {
   addPlant(scene, w / 2 - 0.6, d / 2 - 0.7);
   addPlant(scene, -3.8, -d / 2 + 0.6);
 
-  // Lounge: rug, sofa, coffee table, and the word on the floor.
-  const rug = new THREE.Mesh(new THREE.PlaneGeometry(7.0, 6.0), new THREE.MeshStandardMaterial({ color: '#2B2A24', roughness: 1 }));
-  rug.rotation.x = -Math.PI / 2;
-  rug.position.set(-8.0, 0.01, 4.5);
-  rug.receiveShadow = true;
-  scene.add(rug);
-  scene.add(floorWord('L O U N G E', -8.0, 7.0));
-  const sofa = material('#3B4150');
-  scene.add(box(6.6, 0.45, 1.0, sofa, -8.0, 0.225, 3.0));
-  scene.add(box(6.6, 0.95, 0.3, material('#353B48'), -8.0, 0.62, 2.4));
-  scene.add(box(0.3, 0.7, 1.3, sofa, -11.45, 0.35, 2.85));
-  scene.add(box(0.3, 0.7, 1.3, sofa, -4.55, 0.35, 2.85));
-  scene.add(box(2.6, 0.36, 1.0, material('#2F343E'), -8.0, 0.18, 5.3));
-  for (const x of [-10.4, -8.8, -7.2, -5.6]) {
-    scene.add(box(0.82, 0.25, 0.82, material('#444653'), x, 0.125, 6.6));
-    scene.add(box(0.82, 0.25, 0.82, material('#444653'), x, 0.125, 7.75));
-  }
-  // Low bookshelves and warm side lamps give the lounge its own visual zone.
-  for (const x of [-11.1, -4.9]) {
-    scene.add(box(0.65, 1.45, 0.68, material('#30343E'), x, 0.725, 5.2));
-    scene.add(box(0.35, 0.1, 0.35, material('#E3A82B', { emissive: '#8B5A12' }), x, 1.52, 5.2));
-  }
-
-  // Coffee bar in the front corner, where robots wait for their trading hours.
-  scene.add(box(5.4, 0.98, 0.7, material('#343A44'), -8.2, 0.49, -2.1));
-  scene.add(box(5.55, 0.06, 0.84, material('#4B5260'), -8.2, 1.01, -2.1));
-  const signTex = canvasTexture(512, 96);
-  signTex.ctx.font = font(58, 700);
-  signTex.ctx.fillStyle = GOLD;
-  signTex.ctx.textAlign = 'center';
-  signTex.ctx.fillText('C O F F E E', 256, 70);
-  signTex.texture.needsUpdate = true;
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.36), new THREE.MeshBasicMaterial({ map: signTex.texture, transparent: true }));
-  sign.position.set(-8.2, 0.56, -1.73);
-  scene.add(sign);
-  scene.add(box(0.5, 0.62, 0.42, material('#1E2228'), -6.3, 1.35, -2.1));
-  scene.add(box(0.3, 0.12, 0.12, material('#5B6272'), -6.3, 1.2, -1.84));
-  const machineLed = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), new THREE.MeshBasicMaterial({ color: GREEN }));
-  machineLed.position.set(-6.15, 1.54, -1.84);
-  scene.add(machineLed);
-  for (const [x, z] of [[-10.0, -2.1], [-9.65, -1.95]]) {
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.13, 14), material('#EDEAE3'));
-    cup.position.set(x, 1.105, z);
-    cup.castShadow = true;
-    scene.add(cup);
-  }
-  // Menu board and stools make it read as a coffee bar, even at overview zoom.
-  scene.add(box(2.4, 1.1, 0.08, material('#15191D'), -8.3, 2.5, -2.7));
-  for (const x of [-9.8, -8.2, -6.6]) {
-    scene.add(box(0.12, 0.52, 0.12, material('#252B33'), x, 0.26, -4.45));
-    scene.add(box(0.65, 0.12, 0.65, material('#A16B3E'), x, 0.56, -4.45));
-  }
+  const furniture = furnishOffice(scene);
+  scene.add(floorWord('L O U N G E', -8.0, 8.55));
 
   function drawClocks() {
     for (const { name, zone, tex } of clocks) {
@@ -288,7 +245,7 @@ function buildRoom(scene) {
     }
   }
 
-  return { wall, drawClocks, blink };
+  return { wall, drawClocks, blink, lighting: furniture.lighting };
 }
 
 function floorWord(text, x, z) {
@@ -351,9 +308,13 @@ function addPlant(scene, x, z) {
 function buildDesk(scene, slot) {
   const group = new THREE.Group();
   group.position.set(slot.x, 0, slot.z);
-  const top = material('#4B5260');
+  const top = material('#626F70');
   const body = material('#343A44');
-  group.add(box(2.5, 0.85, 1.1, body, 0, 0.425, 0));
+  for (const x of [-1.0, 1.0]) {
+    group.add(box(.42, .85, 1.0, body, x, .425, 0));
+    for (const y of [.24, .52]) group.add(box(.29, .025, .025, material('#687476'), x, y, .51));
+  }
+  group.add(box(2.1, .30, .05, body, 0, .66, -.48));
   group.add(box(2.56, 0.06, 1.16, top, 0, 0.88, 0));
   const accentMat = new THREE.MeshBasicMaterial({ color: '#3A404B' });
   const accent = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.07, 0.02), accentMat);
@@ -612,6 +573,7 @@ function buildDesk(scene, slot) {
 
   screens.forEach(drawOff);
 
+  let lastPaint = null;
   return {
     slot,
     setVisible(on) {
@@ -619,6 +581,10 @@ function buildDesk(scene, slot) {
     },
     assign(robot, color, mood, history) {
       freeTag.visible = !robot;
+      const historyPhase = Math.floor(Date.now() / 10_000) % 2;
+      const paint = robot ? JSON.stringify([robot.name, robot.symbol, robot.assignment, robot.status, color, mood, history, historyPhase]) : 'empty';
+      if (paint === lastPaint) return;
+      lastPaint = paint;
       if (!robot) {
         accentMat.color.set('#3A404B');
         screens.forEach(drawOff);
@@ -627,7 +593,7 @@ function buildDesk(scene, slot) {
       accentMat.color.set(color);
       drawMain(screens[0], robot, mood, color);
       // The right-hand monitor takes turns: FTMO limits, then the last 7 days.
-      if (robot.assignment !== 'analyst' && history && Math.floor(Date.now() / 10_000) % 2 === 1) drawHistory(screens[1], robot, history);
+      if (robot.assignment !== 'analyst' && history && historyPhase === 1) drawHistory(screens[1], robot, history);
       else drawLimits(screens[1], robot, mood);
     },
   };
@@ -652,6 +618,7 @@ function buildRobot(color, gear, eyes) {
     const pivot = new THREE.Group();
     pivot.position.set(x, 0, 0);
     pivot.add(box(0.22, 0.55, 0.24, darkMat, 0, -0.275, 0));
+    pivot.add(box(.29, .11, .39, bodyMat, 0, -.50, .07));
     hips.add(pivot);
     return pivot;
   };
@@ -660,11 +627,14 @@ function buildRobot(color, gear, eyes) {
 
   hips.add(box(0.82, 0.72, 0.56, bodyMat, 0, 0.36, 0));
   hips.add(box(0.46, 0.26, 0.02, darkMat, 0, 0.44, 0.29));
+  for (const x of [-.14, 0, .14]) hips.add(box(.055, .10, .02, eyeMat, x, .44, .31));
+  hips.add(box(.70, .065, .59, darkMat, 0, .06, 0));
 
   const arm = (x) => {
     const pivot = new THREE.Group();
     pivot.position.set(x, 0.64, 0);
     pivot.add(box(0.17, 0.56, 0.19, bodyMat, 0, -0.26, 0));
+    pivot.add(box(.21, .13, .22, darkMat, 0, -.50, .015));
     hips.add(pivot);
     return pivot;
   };
@@ -676,6 +646,7 @@ function buildRobot(color, gear, eyes) {
   hips.add(head);
   head.add(box(0.74, 0.58, 0.6, bodyMat, 0, 0.29, 0));
   head.add(box(0.58, 0.22, 0.02, darkMat, 0, 0.31, 0.31));
+  head.add(box(.22, .025, .025, eyeMat, 0, .13, .32));
   for (const x of [-0.14, 0.14]) {
     const eye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.02), eyeMat);
     eye.position.set(x, 0.31, 0.325);
@@ -824,7 +795,7 @@ function loungeSpot(seat) {
 }
 
 function coffeeSpot(spot) {
-  return { x: spot.x, z: spot.z, facing: 0, y: 0, approach: { x: spot.x, z: 3.0 } };
+  return { x: spot.x, z: spot.z, facing: Math.PI, y: 0, approach: { x: spot.x, z: spot.z + .8 } };
 }
 
 function placeFor(mood, i) {
@@ -847,7 +818,8 @@ function placeFor(mood, i) {
 // The office
 // ---------------------------------------------------------------------------
 
-export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
+export function createOfficeScene(container, { onSelect, onTour, onCamera, getInsets }) {
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = true;
@@ -862,6 +834,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   scene.background = new THREE.Color('#0B0D11');
 
   const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
+  camera.zoom = HOME.zoom;
   camera.position.copy(HOME.target).add(HOME.offset);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.copy(HOME.target);
@@ -874,8 +847,9 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   controls.maxAzimuthAngle = 1.35;
   controls.update();
 
-  scene.add(new THREE.HemisphereLight('#C9D3FF', '#1A1C20', 1.4));
-  scene.add(new THREE.AmbientLight('#FFFFFF', 0.35));
+  const sky = new THREE.HemisphereLight('#DAE5ED', '#38312A', 1.65);
+  const ambient = new THREE.AmbientLight('#FFFFFF', .4);
+  scene.add(sky, ambient);
   const sun = new THREE.DirectionalLight('#FFF1DD', 2.4);
   sun.position.set(9, 16, 8);
   sun.castShadow = true;
@@ -905,7 +879,8 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   const spotlightId = () => selectedId ?? tourId;
 
   function createActor(id, index) {
-    const tagEl = document.createElement('div');
+    const tagEl = document.createElement('button');
+    tagEl.type = 'button';
     tagEl.className = 'tag';
     tagEl.addEventListener('click', (e) => { e.stopPropagation(); onSelect(id); });
     const tag = new CSS2DObject(tagEl);
@@ -986,7 +961,9 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
         const pnl = Number(s.day_pnl);
         const pnlHtml = Number.isFinite(pnl)
           ? `<span class="pnl ${pnl > 0 ? 'up' : pnl < 0 ? 'down' : ''}">${money(pnl, s.currency || 'USD', true)}</span>` : '';
-        tagEl.innerHTML = `<span class="dot" style="background:${MOODS[moodKey].color}"></span><b>${esc(robot.name)}</b><span class="st">${esc(mood.label)}</span>${pnlHtml}`;
+        const html = `<span class="dot" style="background:${MOODS[moodKey].color}"></span><b>${esc(robot.name)}</b><span class="st">${esc(mood.label)}</span>${pnlHtml}`;
+        if (tagEl.innerHTML !== html) tagEl.innerHTML = html;
+        tagEl.title = `${robot.name} · ${mood.label}`;
         tagEl.classList.toggle('selected', lit);
       },
       spotlight(lit) {
@@ -1023,7 +1000,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
         }
         model.root.position.set(pos.x, y, pos.z);
         model.root.rotation.y = lerpAngle(model.root.rotation.y, facing, Math.min(1, dt * 10));
-        applyPose(model, current, t);
+        applyPose(model, current, reducedMotion.matches ? 0 : t);
         const blinking = moodKey === 'offline' || moodKey === 'blocked';
         model.lamp.visible = !blinking || Math.sin(t * 5) > -0.2;
       },
@@ -1158,6 +1135,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   const goal = new THREE.Vector3();
   const right = new THREE.Vector3();
   const up = new THREE.Vector3();
+  const cameraOffset = new THREE.Vector3();
 
   // Keeps a followed robot in the part of the view the robot's card doesn't cover.
   function clearOfPanel(point) {
@@ -1183,8 +1161,8 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     } else {
       goal.copy(cam.target);
     }
-    const k = 1 - Math.exp(-dt * 3.2);
-    const offset = camera.position.clone().sub(controls.target);
+    const k = reducedMotion.matches ? 1 : 1 - Math.exp(-dt * 5.5);
+    const offset = cameraOffset.copy(camera.position).sub(controls.target);
     if (cam.offset) offset.lerp(cam.offset, k);
     controls.target.lerp(goal, k);
     camera.position.copy(controls.target).add(offset);
@@ -1200,11 +1178,32 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
 
   function focus(id) {
     endTour();
-    cam = { follow: id, zoom: Math.max(camera.zoom, 1.6) };
+    onCamera?.('robot');
+    cam = { follow: id, zoom: viewZoom(2.1) };
   }
 
+  const viewZoom = (zoom) => zoom * (container.clientWidth < 700 ? 2 : 1);
+
   function home() {
+    onCamera?.('overview');
     cam = { target: HOME.target.clone(), offset: HOME.offset.clone(), zoom: HOME.zoom };
+  }
+
+  function zone(name) {
+    const place = ZONES[name];
+    if (!place) return;
+    endTour();
+    onCamera?.(name);
+    cam = { target: place.target.clone(), offset: HOME.offset.clone(), zoom: viewZoom(place.zoom) };
+  }
+
+  function lighting(mode) {
+    const evening = mode === 'evening';
+    sky.intensity = evening ? .85 : 1.65;
+    ambient.intensity = evening ? .22 : .4;
+    sun.intensity = evening ? 1.25 : 2.4;
+    sun.color.set(evening ? '#F5C48E' : '#FFF1DD');
+    room.lighting(mode);
   }
 
   function startTour() {
@@ -1213,7 +1212,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     const next = () => {
       stop = (stop + 1) % (order.length + 1);
       tourId = order[stop] ?? null; // the last stop is the whole office
-      if (tourId) cam = { follow: tourId, zoom: 1.9 };
+      if (tourId) { onCamera?.('robot'); cam = { follow: tourId, zoom: viewZoom(2.1) }; }
       else home();
       refreshSpotlight();
     };
@@ -1235,6 +1234,7 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
   controls.addEventListener('start', () => {
     cam = null;
     endTour();
+    onCamera?.('free');
   });
 
   // Clicking a robot (not dragging the view) selects it.
@@ -1257,8 +1257,10 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     if (!w || !h) return;
     renderer.setSize(w, h);
     labelRenderer.setSize(w, h);
-    const half = w < 700 ? 16.5 : 11.1;
     const aspect = w / h;
+    controls.maxZoom = w < 700 ? 6 : 2.8;
+    // Fit the entire diorama even in a narrow window.
+    const half = Math.max(11.1, 16.5 / aspect);
     camera.left = -half * aspect;
     camera.right = half * aspect;
     camera.top = half;
@@ -1296,6 +1298,8 @@ export function createOfficeScene(container, { onSelect, onTour, getInsets }) {
     },
     focus,
     home,
+    zone,
+    lighting,
     tour(on) {
       if (on) {
         startTour();

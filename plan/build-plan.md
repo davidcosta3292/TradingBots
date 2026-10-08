@@ -89,11 +89,11 @@ This is the skeleton everything else hangs on, built before the strategy exists.
   - A camera tour, and the camera following the selected robot.
   - Optional sounds, and a colour and gear per robot, chosen by its owner.
 - **Online now:** the Vercel office works on phones and Macs; only connected Trader EAs are operational.
+- **Room refresh (8 Oct):** a furnished café and lounge, padded seating, an espresso machine, warm floor lamps and a city window. The first four desks form two rows. Added camera shortcuts, daylight/evening lighting, a robot selection dock, more robot detail, and quicker camera movement. Monitor textures are only redrawn when their displayed data changes. Narrow screens get closer camera views and a bottom control panel.
 
 Telegram now also reports every button press the robot answers, and every trade it opens or closes, the moment it happens.
 
-- A Claw3D-based office. A robot sits at its desk when it's in a trade, waits in the lounge otherwise, and turns red when its heartbeat is lost.
-- Clicking a robot opens its panel: P&L, positions and the four buttons, using the same commands as M1.
+- Clicking a robot or its dock entry opens its panel: P&L, positions and the four buttons, using the same commands as M1.
 
 ### M5 · AI helpers (read-only)
 
