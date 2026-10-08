@@ -34,6 +34,12 @@ These are choices made for demo observation on 29 Sep 2026, with the owner's per
 
 The PDF's STRONG score, DXY check, marked support/resistance and discretionary quality judgment are not implemented. Six marked examples, including losses, would help calibrate this interpretation. Neither the PDF's stated performance nor this draft's profitability has been verified.
 
+## Demo v2 frequency experiment (8 Oct 2026)
+
+After a week with no filled trades, version 1.2.4 keeps the full setup above but changes two demo choices. The entry session is now the whole 08:00-13:00 New York period; the full-hour 09:00 and 11:00 bans were our stricter interpretation. If no trade has filled by 10:00 New York, a second setup can trade at half risk when the 4H direction and at least one of Daily/1H agree, the previous M15 candle pulls back near EMA 20, and the latest completed M15 candle closes beyond that candle in the trend direction. The same broker stop, 3R target, 4 ATR maximum stop distance, news pauses and FTMO limits apply. This continuation setup is a separate demo experiment, not the PDF's five-part CORE setup. It can be disabled with `InpDemoContinuation=false`.
+
+The EA now reports how many completed M15 checks passed while it was active and flat, separating trend waits, setup waits and signals blocked by guards. At 13:00 New York, if there were checks but no filled trade, it sends a no-trade explanation to Telegram and the office. There is no forced entry or guarantee of one trade a day.
+
 ## Rollout
 
-Robot 01's previous EMA exercise should remain paused until the compiled v1.2.1 EA has been installed and reattached. The new EA starts paused; David can then press Start in the office for demo operation. Jhonatan's separate Trader remains for later activation. The Risk Management office slot is still a label, not a connected risk service.
+The compiled v1.2.4 EA has been installed in David's local FTMO MT5 folder. After opening MetaTrader, remove and reattach OfficeRobot so its new Inputs load; check version 1.2.4, then press Start in the office for demo operation. Jhonatan's separate Trader remains for later activation. The Risk Management office slot is still a label, not a connected risk service.

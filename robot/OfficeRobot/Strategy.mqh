@@ -96,13 +96,14 @@ public:
       Release(m_m15Fast); Release(m_m15Slow); Release(m_atr);
      }
 
-   string            Name(void)    { return "XAUUSD plan draft v1: H4/D1/H1 trend, M15 BOS-pullback"; }
+   string            Name(void)    { return "XAUUSD demo v2: BOS-pullback or half-risk continuation"; }
    string            Trends(void)  { return m_trends; }
    string            Check(void)   { return m_check; }
 
    // The last completed M15 bar is b[0]; b[1] is the reaction, b[k]
    // is an earlier structure break. Series indexing is explicit here.
-   ENUM_SIGNAL       Evaluate(double &stopPrice,double &riskFactor,double &atrValue)
+   ENUM_SIGNAL       Evaluate(double &stopPrice,double &riskFactor,double &atrValue,
+                              const bool allowContinuation=false)
      {
       stopPrice=0;
       riskFactor=0;
@@ -113,12 +114,13 @@ public:
       int m15=Trend(PERIOD_M15,m_m15Fast,m_m15Slow);
       m_trends=StringFormat("D1 %s / H4 %s / H1 %s / M15 %s",
                             TrendText(d1),TrendText(h4),TrendText(h1),TrendText(m15));
-      if(h4==0 || m15!=h4 || (d1!=h4 && h1!=h4))
+      if(h4==0 || (d1!=h4 && h1!=h4))
         {
-         m_check="trend alignment: waiting for H4 and M15 plus D1 or H1";
+         m_check="trend alignment: waiting for H4 plus D1 or H1";
          return SIGNAL_NONE;
         }
       riskFactor=(d1==h4 && h1==h4) ? 1.0 : 0.5;
+      bool fullTrend=(m15==h4);
 
       double ema20;
       if(!Value(m_m15Fast,ema20) || !Value(m_atr,atrValue) || atrValue<=0)
@@ -137,12 +139,9 @@ public:
       double reactionRange=b[1].high-b[1].low;
       double reactionBody=MathAbs(b[1].close-b[1].open);
       double confirmBody=MathAbs(b[0].close-b[0].open);
-      if(reactionRange<=0 || reactionBody<reactionRange*0.25 || confirmBody<atrValue*0.10)
-        {
-         m_check="waiting for a clear pullback reaction and confirmation";
-         return SIGNAL_NONE;
-        }
-
+      bool fullCandleShape=(reactionRange>0 && reactionBody>=reactionRange*0.25
+                            && confirmBody>=atrValue*0.10);
+      if(fullTrend && fullCandleShape)
       for(int k=3;k<=12;k++)
         {
          double level=h4>0 ? b[k+1].high : b[k+1].low;
@@ -203,7 +202,36 @@ public:
                                h4>0 ? "BUY" : "SELL",k,riskFactor==1.0 ? "full" : "half");
          return h4>0 ? SIGNAL_BUY : SIGNAL_SELL;
         }
-      m_check="waiting for BOS, zone retest, reaction and next-candle confirmation";
+      // Demo-only second chance after 10:00 NY when there has been no fill
+      // today. It needs the same H4 direction and a supporting higher trend,
+      // but a simpler M15 EMA pullback and close beyond the prior candle.
+      // This is explicitly not the PDF's full five-part setup.
+      if(allowContinuation && reactionRange>0 && confirmBody>=atrValue*0.12)
+        {
+         bool pullback=h4>0 ? (b[1].low<=ema20+0.55*atrValue
+                               && b[1].close>=ema20-0.35*atrValue)
+                            : (b[1].high>=ema20-0.55*atrValue
+                               && b[1].close<=ema20+0.35*atrValue);
+         bool confirmed=h4>0 ? (b[0].close>b[0].open && b[0].close>b[1].high
+                                 && b[0].close>ema20)
+                              : (b[0].close<b[0].open && b[0].close<b[1].low
+                                 && b[0].close<ema20);
+         if(pullback && confirmed)
+           {
+            double extreme=h4>0 ? MathMin(b[0].low,b[1].low)
+                                : MathMax(b[0].high,b[1].high);
+            double rawStop=h4>0 ? extreme-0.15*atrValue : extreme+0.15*atrValue;
+            stopPrice=h4>0 ? MathMin(rawStop,b[0].close-1.20*atrValue)
+                           : MathMax(rawStop,b[0].close+1.20*atrValue);
+            riskFactor=0.5;
+            m_check=StringFormat("%s demo continuation: M15 EMA pullback and confirmed break; half risk",
+                                  h4>0 ? "BUY" : "SELL");
+            return h4>0 ? SIGNAL_BUY : SIGNAL_SELL;
+           }
+        }
+      m_check=fullTrend
+              ? "waiting for BOS/retest or a confirmed M15 continuation"
+              : "M15 disagrees with H4; waiting for a confirmed continuation";
       return SIGNAL_NONE;
      }
   };

@@ -683,10 +683,11 @@ function card(r) {
 
     <p class="seen">${seenText(r, online)}</p>
     ${s.exercise_mode ? `<p class="exercise-note"><b>Demo exercise</b> · EMA bias on closed M1 bars · timed exit after ${esc(s.exercise_hold_minutes ?? 3)} min or stop/target · ${esc(s.risk_pct ?? 0.05)}% risk per entry. This is an execution check, not a validated strategy.</p>` : ''}
-    ${s.signal_check ? `<div class="plan-note"><b>XAUUSD plan draft · demo</b>
+    ${s.signal_check ? `<div class="plan-note"><b>XAUUSD demo · full plan + continuation</b>
       <span>${esc(s.trends || 'Waiting for trend data')}</span>
       <span>${esc(s.signal_check)}</span>
-      <small>Up to ${esc(s.risk_pct ?? 0.1)}% risk · ${esc(s.target_r ?? 3)}R target · ${esc(s.max_hold_hours ?? 6)}h maximum hold · ${esc(s.loss_streak ?? 0)} losses in a row</small>
+      <small>Full setup up to ${esc(s.risk_pct ?? 0.1)}% risk · continuation half risk · ${esc(s.target_r ?? 3)}R target · ${esc(s.max_hold_hours ?? 6)}h maximum hold · ${esc(s.loss_streak ?? 0)} losses in a row</small>
+      ${s.checks_today != null ? `<small>NY session since EA start: ${esc(s.checks_today)} M15 checks · ${esc(s.trend_waits_today ?? 0)} trend waits · ${esc(s.pattern_waits_today ?? 0)} setup waits · ${esc(s.guard_skips_today ?? 0)} guarded signals</small>` : ''}
     </div>` : ''}
 
     ${positions.length
@@ -937,7 +938,7 @@ function loadDemo() {
   store.me = { id: 'me' };
   store.members.set('me', 'David').set('friend', 'Friend');
   const base = {
-    currency: 'USD', timeframe: 'M15', strategy: 'XAUUSD plan draft v1: H4/D1/H1 trend, M15 BOS-pullback', initial: 25000,
+    currency: 'USD', timeframe: 'M15', strategy: 'XAUUSD demo v2: BOS-pullback or half-risk continuation', initial: 25000,
     risk_pct: 0.1, target_r: 3, max_hold_hours: 6, loss_streak: 0,
     trends: 'D1 up / H4 up / H1 up / M15 up',
     signal_check: 'BUY: structure break, zone retest, reaction, confirmation',

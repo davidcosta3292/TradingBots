@@ -8,8 +8,8 @@
 //|  - Starts paused, except for a same-chart timeframe change.      |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "1.23"
-#property description "Trading Office robot: XAUUSD plan draft, demo only, FTMO guards, office controls."
+#property version     "1.24"
+#property description "Trading Office robot: XAUUSD demo v2, FTMO guards, office controls."
 
 #include "Clock.mqh"
 #include "Json.mqh"
@@ -18,7 +18,7 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.2.3"
+#define ROBOT_VERSION "1.2.4"
 // Our office. Used whenever the URL or key input is left empty.
 #define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
 #define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
@@ -50,6 +50,7 @@ input int             InpLossCooldownMinutes= 30;          // No new entry after
 input int             InpStartHourNewYork   = 8;           // No new entries before this NY hour
 input int             InpEndHourNewYork     = 13;          // No new entries from this NY hour
 input int             InpMaxSlippagePoints  = 30;          // Max slippage, points
+input bool            InpDemoContinuation   = true;        // After 10 NY, half-risk continuation if no trade today
 
 input group "FTMO 2-Step rules"
 input double          InpInitialBalance     = 0;           // Initial balance (0 = first deposit)
@@ -82,6 +83,12 @@ string           g_lastUpcomingNews="";
 int              g_holdCloseFailures=0;
 datetime         g_lastHoldAttempt=0;
 long             g_doneIds[];              // commands already carried out
+int              g_opportunityDay=0;       // New York calendar date
+int              g_reviewSentDay=0;
+int              g_checksToday=0;
+int              g_trendWaitsToday=0;
+int              g_patternWaitsToday=0;
+int              g_guardSkipsToday=0;
 
 // A chart-period switch reinitializes an EA. Carry its state through that
 // single restart, but never through a terminal restart, recompile or removal.
@@ -274,9 +281,9 @@ void RefreshBlocks(void)
       AddBlock("daily loss stop reached");
    MqlDateTime ny;
    TimeToStruct(ClockNewYork(),ny);
-   if(ny.hour<InpStartHourNewYork || ny.hour>=InpEndHourNewYork
-      || ny.hour==9 || ny.hour==11)
-      AddBlock("outside entry windows (08:00-09:00, 10:00-11:00, 12:00-13:00 New York)");
+   if(ny.hour<InpStartHourNewYork || ny.hour>=InpEndHourNewYork)
+      AddBlock(StringFormat("outside entry window (%02d:00-%02d:00 New York)",
+                            InpStartHourNewYork,InpEndHourNewYork));
    if(g_guards.TradesToday()>=InpMaxTradesPerDay)
       AddBlock(StringFormat("already %d trades today",g_guards.TradesToday()));
    string loss=g_guards.LossReason(InpLossCooldownMinutes);
@@ -366,6 +373,10 @@ string BuildReport(void)
                  +","+JKey("max_hold_hours")+JInt(InpMaxHoldHours)
                  +","+JKey("trends")+JStr(g_strategy.Trends())
                  +","+JKey("signal_check")+JStr(g_strategy.Check())
+                 +","+JKey("checks_today")+JInt(g_checksToday)
+                 +","+JKey("trend_waits_today")+JInt(g_trendWaitsToday)
+                 +","+JKey("pattern_waits_today")+JInt(g_patternWaitsToday)
+                 +","+JKey("guard_skips_today")+JInt(g_guardSkipsToday)
                  +","+JKey("loss_streak")+JInt(g_guards.ConsecutiveLosses())
                  +","+JKey("new_york_time")+JStr(TimeToString(ClockNewYork(),TIME_MINUTES))
                  +","+JKey("server")+JStr(AccountInfoString(ACCOUNT_SERVER))
@@ -641,14 +652,44 @@ void WatchNews(void)
 //+------------------------------------------------------------------+
 void OnNewBar(void)
   {
+   MqlDateTime ny;
+   TimeToStruct(ClockNewYork(),ny);
+   int today=ny.year*10000+ny.mon*100+ny.day;
+   if(today!=g_opportunityDay)
+     {
+      g_opportunityDay=today;
+      g_checksToday=0;
+      g_trendWaitsToday=0;
+      g_patternWaitsToday=0;
+      g_guardSkipsToday=0;
+     }
+   bool occupied=(g_trader.Direction()!=0 || g_trader.HasPending());
+   bool reviewing=(g_state==STATE_ACTIVE && !occupied
+                   && ny.hour>=InpStartHourNewYork && ny.hour<InpEndHourNewYork);
+   if(reviewing)
+      g_checksToday++;
    double stopPrice=0,riskFactor=0,atr=0;
-   ENUM_SIGNAL signal=g_strategy.Evaluate(stopPrice,riskFactor,atr);
+   bool continuation=InpDemoContinuation && ny.hour>=10 && g_guards.TradesToday()==0;
+   ENUM_SIGNAL signal=g_strategy.Evaluate(stopPrice,riskFactor,atr,continuation);
    g_reportNow=true;                           // show current trend/signal check in office
-   if(signal==SIGNAL_NONE || g_trader.Direction()!=0 || g_trader.HasPending())
+   if(signal==SIGNAL_NONE || occupied)
+     {
+      if(reviewing && signal==SIGNAL_NONE)
+        {
+         if(StringFind(g_strategy.Check(),"trend")>=0 || StringFind(g_strategy.Check(),"M15 disagrees")>=0)
+            g_trendWaitsToday++;
+         else
+            g_patternWaitsToday++;
+        }
       return;
+     }
    RefreshBlocks();
    if(g_state!=STATE_ACTIVE || ArraySize(g_blocks)>0)
+     {
+      if(reviewing)
+         g_guardSkipsToday++;
       return;
+     }
 
    if(atr<=0 || riskFactor<=0)
       return;
@@ -667,6 +708,22 @@ void OnNewBar(void)
      }
    else
       Event(sent ? "error" : "info","Skipped a plan signal: "+info);
+  }
+
+void ReviewNoTradeDay(void)
+  {
+   MqlDateTime ny;
+   TimeToStruct(ClockNewYork(),ny);
+   int today=ny.year*10000+ny.mon*100+ny.day;
+   if(ny.hour<InpEndHourNewYork || today!=g_opportunityDay
+      || g_reviewSentDay==today || g_checksToday==0)
+      return;
+   g_reviewSentDay=today;
+   if(g_guards.TradesToday()>0)
+      return;
+   Event("info",StringFormat("No XAUUSD trade in today's NY session: %d completed M15 checks since this EA started, %d trend waits, %d pattern waits, %d guarded signals. Last check: %s. A trade is never forced just to meet the daily goal.",
+                        g_checksToday,g_trendWaitsToday,g_patternWaitsToday,
+                        g_guardSkipsToday,g_strategy.Check()));
   }
 
 //+------------------------------------------------------------------+
@@ -789,6 +846,7 @@ void OnTimer(void)
    EnforceLossStreak();
    RefreshBlocks();
    WatchNews();
+   ReviewNoTradeDay();
    ShowOnChart();
    if(!g_link.Enabled() || !g_link.ReadyToTry())
       return;
