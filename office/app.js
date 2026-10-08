@@ -187,15 +187,18 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=14')
+  officeLoading ??= import('./scene.js?v=15')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
-        onCamera: (name) => document.querySelectorAll('[data-home], [data-zone]').forEach((button) => {
+        onCamera: (name) => {
+          document.querySelector('[data-camera-place]').value = name;
+          document.querySelectorAll('[data-home], [data-zone]').forEach((button) => {
           const active = (button.dataset.zone || 'overview') === name;
           button.classList.toggle('on', active);
           button.setAttribute('aria-pressed', String(active));
-        }),
+          });
+        },
         onTour: (on) => {
           const button = document.querySelector('[data-tour]');
           button.classList.toggle('on', on);
@@ -206,6 +209,7 @@ function loadOffice() {
       });
       office.lighting(lightingMode);
       renderLighting();
+      if (window.innerWidth < 700) office.zone('desks');
       return office;
     })
     .catch((error) => {
@@ -218,16 +222,18 @@ function loadOffice() {
 // Selecting a robot opens its card and brings the camera to it.
 function select(id) {
   const was = selectedId;
+  closeCameraMenu();
   selectedId = id;
   if (id) office?.focus(id);
   else if (was) office?.home();
   render();
+  if (id !== was) $('panel').scrollTop = 0;
 }
 
 function sizeOfficeView() {
   if (view !== 'office') return;
   const area = $('scene-view');
-  area.style.height = `${Math.max(420, window.innerHeight - area.getBoundingClientRect().top - 16)}px`;
+  area.style.height = `${Math.max(260, window.innerHeight - area.getBoundingClientRect().top - 16)}px`;
 }
 
 function renderLighting() {
@@ -419,6 +425,22 @@ async function onClick(event) {
   if (target.closest('[data-signout]')) return sb?.auth.signOut();
   if (target.closest('[data-retry-load]')) return location.reload();
   if (target.closest('[data-close-panel]')) return select(null);
+  const navMode = target.closest('[data-nav-mode]');
+  if (navMode) {
+    office?.navigation(navMode.dataset.navMode);
+    document.querySelectorAll('[data-nav-mode]').forEach((button) => {
+      const active = button === navMode;
+      button.classList.toggle('on', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    return;
+  }
+  const moreButton = target.closest('[data-camera-more]');
+  if (moreButton) {
+    $('camera-more').hidden = !$('camera-more').hidden;
+    moreButton.setAttribute('aria-expanded', String(!$('camera-more').hidden));
+    return;
+  }
   const robotLink = target.closest('[data-select-robot]');
   if (robotLink) return select(robotLink.dataset.selectRobot);
   const zoneButton = target.closest('[data-zone]');
@@ -440,6 +462,7 @@ async function onClick(event) {
   }
   const tourButton = target.closest('[data-tour]');
   if (tourButton) {
+    closeCameraMenu();
     const on = !tourButton.classList.contains('on');
     if (on) selectedId = null; // the tour shows every robot, so close the open card
     office?.tour(on);
@@ -452,6 +475,7 @@ async function onClick(event) {
   }
   const legendButton = target.closest('[data-legend]');
   if (legendButton) {
+    closeCameraMenu();
     $('legend').hidden = !$('legend').hidden;
     legendButton.classList.toggle('on', !$('legend').hidden);
     return;
@@ -490,6 +514,13 @@ async function onClick(event) {
 }
 
 async function onChange(event) {
+  const cameraPlace = event.target.closest('[data-camera-place]');
+  if (cameraPlace) {
+    selectedId = null;
+    if (cameraPlace.value === 'overview') office?.tour(false);
+    else office?.zone(cameraPlace.value);
+    return render();
+  }
   const select = event.target.closest('select[data-assignment]');
   if (!select) return;
   const robot = store.robots.get(select.dataset.assignment);
@@ -512,6 +543,11 @@ async function onChange(event) {
     setupOpen = true;
   }
   render();
+}
+
+function closeCameraMenu() {
+  $('camera-more').hidden = true;
+  document.querySelector('[data-camera-more]').setAttribute('aria-expanded', 'false');
 }
 
 async function createMyRobot(event) {
@@ -729,6 +765,9 @@ function card(r) {
     </header>
 
     <p class="seen">${seenText(r, online)}</p>
+    ${mine ? buttons(r, online, command)
+      : `<p class="viewonly">Only ${esc(owner)} can control this robot. FTMO allows nobody else to use their account.</p>`}
+    ${command ? commandLine(command) : ''}
     ${s.exercise_mode ? `<p class="exercise-note"><b>Demo exercise</b> · EMA bias on closed M1 bars · timed exit after ${esc(s.exercise_hold_minutes ?? 3)} min or stop/target · ${esc(s.risk_pct ?? 0.05)}% risk per entry. This is an execution check, not a validated strategy.</p>` : ''}
     ${s.signal_check ? `<div class="plan-note"><b>XAUUSD demo · full plan + continuation</b>
       <span>${esc(s.trends || 'Waiting for trend data')}</span>
@@ -758,10 +797,6 @@ function card(r) {
       ${note ? `<p class="resume">${esc(note)}</p>` : ''}</div>` : ''}
     ${online && s.upcoming_news ? `<p class="upcoming-news"><b>News watch · next hour</b> ${esc(s.upcoming_news)}</p>` : ''}
     ${s.link_error ? `<p class="warn">${esc(s.link_error)}</p>` : ''}
-
-    ${mine ? buttons(r, online, command)
-      : `<p class="viewonly">Only ${esc(owner)} can control this robot. FTMO allows nobody else to use their account.</p>`}
-    ${command ? commandLine(command) : ''}
 
     ${tradeHistory(r, currency)}
     ${mine ? assignmentPicker(r) : ''}

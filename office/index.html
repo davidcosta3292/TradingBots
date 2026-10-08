@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0E1014">
   <title>Trading Office</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z' fill='%230E1014' stroke='%23E3A82B' stroke-width='2'/%3E%3Crect x='8' y='9' width='8' height='6.4' rx='1.6' fill='%23E3A82B'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=16">
   <script type="importmap">
     {
       "imports": {
@@ -16,7 +16,7 @@
     }
   </script>
   <script src="config.js"></script>
-  <script type="module" src="app.js?v=16"></script>
+  <script type="module" src="app.js?v=17"></script>
 </head>
 <body>
   <header class="topbar">
@@ -48,17 +48,31 @@
       <div id="scene-view" class="scene-view">
         <div id="scene" class="scene"></div>
         <nav class="scene-tools" aria-label="Office camera">
+          <div class="camera-presets">
           <button type="button" data-home aria-pressed="true" class="on" title="Show the whole office">Overview</button>
           <button type="button" data-zone="desks" aria-pressed="false">Desks</button>
           <button type="button" data-zone="coffee" aria-pressed="false">Café</button>
           <button type="button" data-zone="lounge" aria-pressed="false">Lounge</button>
+          </div>
+          <select class="camera-select" data-camera-place aria-label="Office view">
+            <option value="overview">Overview</option><option value="desks">Desks</option>
+            <option value="coffee">Café</option><option value="lounge">Lounge</option>
+            <option value="free" hidden>Free view</option><option value="robot" hidden>Robot</option>
+          </select>
+          <div class="camera-modes" aria-label="Drag mode">
+            <button type="button" data-nav-mode="pan" aria-pressed="true" class="on">Move</button>
+            <button type="button" data-nav-mode="rotate" aria-pressed="false">Rotate</button>
+          </div>
+          <button type="button" data-camera-more aria-expanded="false" aria-controls="camera-more">More</button>
+        </nav>
+        <div id="camera-more" class="camera-more" hidden>
           <button type="button" data-tour aria-pressed="false">Tour</button>
           <button type="button" data-legend>Legend</button>
           <button type="button" data-lighting aria-pressed="false" title="Change the office lighting">Evening light</button>
-        </nav>
+        </div>
         <div id="legend" class="legend" hidden></div>
         <nav id="team-dock" class="team-dock" aria-label="Select a robot"></nav>
-        <p class="scene-hint">Drag to turn · scroll to zoom · click a robot</p>
+        <p class="scene-hint"><span class="desktop-hint">Drag to move · scroll ↕ zoom · scroll ↔ move</span><span class="touch-hint">Drag to move · pinch to zoom · tap a robot</span></p>
         <aside id="panel" class="panel" hidden></aside>
       </div>
       <div id="robots" class="grid"></div>

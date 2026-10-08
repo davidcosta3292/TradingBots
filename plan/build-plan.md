@@ -90,6 +90,7 @@ This is the skeleton everything else hangs on, built before the strategy exists.
   - Optional sounds, and a colour and gear per robot, chosen by its owner.
 - **Online now:** the Vercel office works on phones and Macs; only connected Trader EAs are operational.
 - **Room refresh (8 Oct):** a furnished café and lounge, padded seating, an espresso machine, warm floor lamps and a city window. The first four desks form two rows. Added camera shortcuts, daylight/evening lighting, a robot selection dock, more robot detail, and quicker camera movement. Monitor textures are only redrawn when their displayed data changes. Narrow screens get closer camera views and a bottom control panel.
+- **Navigation follow-up (8 Oct):** single-drag movement, a separate Rotate mode, horizontal scrolling to pan, and no recentering from empty-floor clicks. Labels also allow dragging. Phones have a compact view selector, persistent robot dock, and controls near the card's top; mobile shadows and rendering use a smaller frame budget.
 
 Telegram now also reports every button press the robot answers, and every trade it opens or closes, the moment it happens.
 

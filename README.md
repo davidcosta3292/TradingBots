@@ -79,6 +79,8 @@ The page has two views: **Office**, the 3D office, and **Cards**, the plain list
 
 The office has **Overview**, **Desks**, **Café** and **Lounge** camera shortcuts, a **Tour**, and a robot dock along the bottom for quick selection. **Evening light / Daylight** changes the room lighting and remembers your choice in that browser. Robot colours, eye colours and accessories are in the owner's **Look in the office** section. Camera movement is reduced when the device requests reduced motion.
 
+**Navigation:** drag once to move the room. Choose **Rotate** to turn it, and **Move** to return to panning. Vertical scrolling zooms; horizontal scrolling or **Shift + wheel** moves across the room. On a phone, use one finger to move and two fingers to zoom. The view selector opens each area; **More** contains the tour, legend and lighting. Robot controls appear near the top of the card, and the phone's robot dock stays visible while the card is open.
+
 In the office, where a robot is tells you what it's doing:
 
 | Where | What it means |

@@ -821,7 +821,7 @@ function placeFor(mood, i) {
 export function createOfficeScene(container, { onSelect, onTour, onCamera, getInsets }) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, container.clientWidth < 700 ? 1 : 1.5));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
@@ -836,9 +836,15 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
   const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
   camera.zoom = HOME.zoom;
   camera.position.copy(HOME.target).add(HOME.offset);
-  const controls = new OrbitControls(camera, renderer.domElement);
+  const controls = new OrbitControls(camera, container);
   controls.target.copy(HOME.target);
   controls.enableDamping = true;
+  controls.dampingFactor = .14;
+  controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+  controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+  controls.touches.ONE = THREE.TOUCH.PAN;
+  controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+  container.style.cursor = 'grab';
   controls.minZoom = 0.7;
   controls.maxZoom = 2.8;
   controls.minPolarAngle = 0.55;
@@ -853,7 +859,8 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
   const sun = new THREE.DirectionalLight('#FFF1DD', 2.4);
   sun.position.set(9, 16, 8);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  const shadowSize = container.clientWidth < 700 ? 512 : 1024;
+  sun.shadow.mapSize.set(shadowSize, shadowSize);
   Object.assign(sun.shadow.camera, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 65 });
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.02;
@@ -863,6 +870,12 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
   room.drawClocks();
   const clockTimer = setInterval(room.drawClocks, 20_000);
   const desks = DESK_SLOTS.map((slot) => buildDesk(scene, slot));
+  // Furniture never moves: keep its local transforms instead of calculating
+  // them again on every frame. Animated robots are added after this pass.
+  scene.traverse((object) => {
+    object.updateMatrix();
+    object.matrixAutoUpdate = false;
+  });
 
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.74, 40), new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.9 }));
   ring.rotation.x = -Math.PI / 2;
@@ -881,8 +894,12 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
   function createActor(id, index) {
     const tagEl = document.createElement('button');
     tagEl.type = 'button';
+    tagEl.dataset.robotTag = id;
     tagEl.className = 'tag';
-    tagEl.addEventListener('click', (e) => { e.stopPropagation(); onSelect(id); });
+    tagEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (e.detail === 0) onSelect(id); // keyboard; pointer taps are handled below
+    });
     const tag = new CSS2DObject(tagEl);
     const tagY = 2.05 + (index % 2) * 0.5; // alternate heights so neighbours' tags don't overlap
     tag.position.set(0, tagY, 0);
@@ -1179,7 +1196,7 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
   function focus(id) {
     endTour();
     onCamera?.('robot');
-    cam = { follow: id, zoom: viewZoom(2.1) };
+    cam = { follow: id, baseZoom: 2.1, zoom: viewZoom(2.1) };
   }
 
   const viewZoom = (zoom) => zoom * (container.clientWidth < 700 ? 2 : 1);
@@ -1194,7 +1211,7 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
     if (!place) return;
     endTour();
     onCamera?.(name);
-    cam = { target: place.target.clone(), offset: HOME.offset.clone(), zoom: viewZoom(place.zoom) };
+    cam = { target: place.target.clone(), offset: HOME.offset.clone(), baseZoom: place.zoom, zoom: viewZoom(place.zoom) };
   }
 
   function lighting(mode) {
@@ -1206,13 +1223,19 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
     room.lighting(mode);
   }
 
+  function navigation(mode) {
+    const rotate = mode === 'rotate';
+    controls.mouseButtons.LEFT = rotate ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
+    controls.touches.ONE = rotate ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
+  }
+
   function startTour() {
     endTour();
     let stop = -1;
     const next = () => {
       stop = (stop + 1) % (order.length + 1);
       tourId = order[stop] ?? null; // the last stop is the whole office
-      if (tourId) { onCamera?.('robot'); cam = { follow: tourId, zoom: viewZoom(2.1) }; }
+      if (tourId) { onCamera?.('robot'); cam = { follow: tourId, baseZoom: 2.1, zoom: viewZoom(2.1) }; }
       else home();
       refreshSpotlight();
     };
@@ -1231,24 +1254,65 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
   }
 
   // Dragging or zooming by hand takes the camera back.
-  controls.addEventListener('start', () => {
+  function takeCamera() {
     cam = null;
     endTour();
     onCamera?.('free');
-  });
+  }
+  controls.addEventListener('start', takeCamera);
+
+  // Vertical wheel zooms. A trackpad's horizontal gesture (or Shift + wheel)
+  // moves across the room without sending that gesture to OrbitControls' zoom.
+  function horizontalWheel(e) {
+    const shifted = e.shiftKey && !e.deltaX;
+    const dx = shifted ? e.deltaY : e.deltaX;
+    if (e.ctrlKey || (!shifted && Math.abs(dx) <= Math.abs(e.deltaY))) return;
+    if (!dx) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    takeCamera();
+    const pixels = dx * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? container.clientWidth : 1);
+    const units = (camera.right - camera.left) / camera.zoom / container.clientWidth;
+    right.setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(pixels * units);
+    camera.position.add(right);
+    controls.target.add(right);
+    controls.update();
+  }
+  container.addEventListener('wheel', horizontalWheel, { capture: true, passive: false });
 
   // Clicking a robot (not dragging the view) selects it.
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  let downAt = null;
-  renderer.domElement.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; });
-  renderer.domElement.addEventListener('pointerup', (e) => {
-    if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 6) return;
+  let tap = null;
+  const pointers = new Set();
+  container.addEventListener('pointerdown', (e) => {
+    pointers.add(e.pointerId);
+    if (e.isPrimary && e.button === 0) tap = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false,
+      robot: e.target.closest?.('[data-robot-tag]')?.dataset.robotTag };
+    if (pointers.size > 1 && tap) tap.moved = true;
+    container.style.cursor = 'grabbing';
+  }, true);
+  container.addEventListener('pointermove', (e) => {
+    if (tap?.id === e.pointerId && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 6) tap.moved = true;
+  }, true);
+  container.addEventListener('pointercancel', (e) => {
+    pointers.delete(e.pointerId);
+    tap = null;
+    container.style.cursor = 'grab';
+  });
+  container.addEventListener('pointerup', (e) => {
+    pointers.delete(e.pointerId);
+    container.style.cursor = pointers.size ? 'grabbing' : 'grab';
+    if (!tap || tap.id !== e.pointerId || tap.moved || e.button !== 0 || Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 6) return;
+    const robotTag = tap.robot;
+    tap = null;
+    if (robotTag) return onSelect(robotTag);
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(scene.children, true).find((h) => h.object.userData.robotId);
-    onSelect(hit ? hit.object.userData.robotId : null);
+    // Empty-floor taps do not close a card or fly the camera back home.
+    if (hit) onSelect(hit.object.userData.robotId);
   });
 
   function resize() {
@@ -1259,6 +1323,8 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
     labelRenderer.setSize(w, h);
     const aspect = w / h;
     controls.maxZoom = w < 700 ? 6 : 2.8;
+    if (cam?.baseZoom) cam.zoom = viewZoom(cam.baseZoom);
+    camera.zoom = Math.min(camera.zoom, controls.maxZoom);
     // Fit the entire diorama even in a narrow window.
     const half = Math.max(11.1, 16.5 / aspect);
     camera.left = -half * aspect;
@@ -1272,7 +1338,13 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
 
   const clock = new THREE.Clock();
   let running = false;
-  function tick() {
+  let lastFrame = 0;
+  function tick(timestamp) {
+    // Leave time for the controls and reports rather than continuously
+    // rendering extra shadows and labels between visible animation frames.
+    const elapsed = timestamp - lastFrame;
+    if (elapsed < 1000 / 30 - .5) return;
+    lastFrame = timestamp - elapsed % (1000 / 30);
     // Up to a quarter second per frame, so robots keep walking at the right
     // pace even when the browser throttles a background tab.
     const dt = Math.min(clock.getDelta(), 0.25);
@@ -1300,6 +1372,7 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
     home,
     zone,
     lighting,
+    navigation,
     tour(on) {
       if (on) {
         startTour();
@@ -1314,6 +1387,7 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
       labelRenderer.domElement.style.display = on ? '' : 'none';
       if (on) {
         resize();
+        lastFrame = 0;
         clock.getDelta();
       } else {
         endTour();
@@ -1325,6 +1399,8 @@ export function createOfficeScene(container, { onSelect, onTour, onCamera, getIn
       endTour();
       clearInterval(clockTimer);
       observer.disconnect();
+      controls.dispose();
+      container.removeEventListener('wheel', horizontalWheel, true);
       renderer.dispose();
     },
   };
