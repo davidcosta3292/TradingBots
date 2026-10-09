@@ -8,8 +8,8 @@
 //|  - Starts paused, except for a same-chart timeframe change.      |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "1.24"
-#property description "Trading Office robot: XAUUSD demo v2, FTMO guards, office controls."
+#property version     "1.30"
+#property description "Trading Office robot: XAUUSD demo v3, per-bar diagnostics, FTMO guards."
 
 #include "Clock.mqh"
 #include "Json.mqh"
@@ -18,7 +18,7 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.2.4"
+#define ROBOT_VERSION "1.3.0"
 // Our office. Used whenever the URL or key input is left empty.
 #define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
 #define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
@@ -76,6 +76,8 @@ datetime         g_lastBar=0;
 datetime         g_lastPoll=0;
 datetime         g_lastReport=0;
 bool             g_reportNow=true;
+string           g_checkJson="null";
+bool             g_signalReady=false;
 string           g_blocks[];               // why the robot can't open a trade right now
 string           g_lastAction="";
 string           g_lastNewsReason="";
@@ -88,6 +90,7 @@ int              g_reviewSentDay=0;
 int              g_checksToday=0;
 int              g_trendWaitsToday=0;
 int              g_patternWaitsToday=0;
+int              g_sizeSkipsToday=0;
 int              g_guardSkipsToday=0;
 
 // A chart-period switch reinitializes an EA. Carry its state through that
@@ -373,9 +376,12 @@ string BuildReport(void)
                  +","+JKey("max_hold_hours")+JInt(InpMaxHoldHours)
                  +","+JKey("trends")+JStr(g_strategy.Trends())
                  +","+JKey("signal_check")+JStr(g_strategy.Check())
+                 +","+JKey("strategy_check")+g_checkJson
+                 +","+JKey("signal_ready")+JBool(g_signalReady)
                  +","+JKey("checks_today")+JInt(g_checksToday)
                  +","+JKey("trend_waits_today")+JInt(g_trendWaitsToday)
                  +","+JKey("pattern_waits_today")+JInt(g_patternWaitsToday)
+                 +","+JKey("size_skips_today")+JInt(g_sizeSkipsToday)
                  +","+JKey("guard_skips_today")+JInt(g_guardSkipsToday)
                  +","+JKey("loss_streak")+JInt(g_guards.ConsecutiveLosses())
                  +","+JKey("new_york_time")+JStr(TimeToString(ClockNewYork(),TIME_MINUTES))
@@ -400,6 +406,7 @@ string BuildReport(void)
                  +","+JKey("blocks")+"["+blocks+"]"
                  +","+JKey("upcoming_news")+JStr(g_guards.UpcomingNews())
                  +","+JKey("can_trade")+JBool(g_state==STATE_ACTIVE && ArraySize(g_blocks)==0)
+                 +","+JKey("operational_permission")+JBool(g_state==STATE_ACTIVE && ArraySize(g_blocks)==0)
                  +","+JKey("last_action")+JStr(g_lastAction)
                  +","+JKey("link_error")+JStr(g_link.LastError())
                  +","+JKey("prague_time")+JStr(TimeToString(ClockPrague(),TIME_MINUTES))
@@ -650,6 +657,21 @@ void WatchNews(void)
 //+------------------------------------------------------------------+
 //| Strategy: once per closed bar                                    |
 //+------------------------------------------------------------------+
+void RecordStrategyCheck(const ENUM_SIGNAL signal,const bool occupied,const string decision,const bool eligible=false)
+  {
+   string blocks="";
+   for(int i=0;i<ArraySize(g_blocks);i++) { if(i>0) blocks+=","; blocks+=JStr(g_blocks[i]); }
+   g_signalReady=signal!=SIGNAL_NONE;
+   g_checkJson="{"+JKey("at")+JInt((long)ClockServerToUtc(iTime(_Symbol,PERIOD_M15,0)))
+      +","+JKey("checked_at")+JInt((long)ClockGmt())+","+JKey("version")+JStr(ROBOT_VERSION)
+      +","+JKey("signal_ready")+JBool(g_signalReady)+","+JKey("operational_permission")+JBool(g_state==STATE_ACTIVE && ArraySize(g_blocks)==0)
+      +","+JKey("position_free")+JBool(!occupied)+","+JKey("order_eligible")+JBool(eligible)
+      +","+JKey("decision")+JStr(decision)+","+JKey("blocks")+"["+blocks+"]"
+      +","+JKey("strategy")+g_strategy.Diagnostics()+","+JKey("sizing")+g_trader.PlanJson()+"}";
+   Print("[Office][M15 check] ",g_checkJson);
+   g_reportNow=true;
+  }
+
 void OnNewBar(void)
   {
    MqlDateTime ny;
@@ -661,6 +683,7 @@ void OnNewBar(void)
       g_checksToday=0;
       g_trendWaitsToday=0;
       g_patternWaitsToday=0;
+      g_sizeSkipsToday=0;
       g_guardSkipsToday=0;
      }
    bool occupied=(g_trader.Direction()!=0 || g_trader.HasPending());
@@ -671,30 +694,38 @@ void OnNewBar(void)
    double stopPrice=0,riskFactor=0,atr=0;
    bool continuation=InpDemoContinuation && ny.hour>=10 && g_guards.TradesToday()==0;
    ENUM_SIGNAL signal=g_strategy.Evaluate(stopPrice,riskFactor,atr,continuation);
-   g_reportNow=true;                           // show current trend/signal check in office
+   g_trader.ResetPlan();
+   RefreshBlocks();
    if(signal==SIGNAL_NONE || occupied)
      {
       if(reviewing && signal==SIGNAL_NONE)
         {
-         if(StringFind(g_strategy.Check(),"trend")>=0 || StringFind(g_strategy.Check(),"M15 disagrees")>=0)
+         if(!g_strategy.TrendPassed())
             g_trendWaitsToday++;
          else
             g_patternWaitsToday++;
         }
+      RecordStrategyCheck(signal,occupied,occupied ? "position already open" : "waiting for setup");
       return;
      }
-   RefreshBlocks();
+   double risk=g_guards.Initial()*InpRiskPercent/100.0*riskFactor;
+   string info;
+   bool sizeOk=g_trader.Preview((int)signal,stopPrice,4.0*atr,InpTargetR,risk,InpMaxLots,info);
    if(g_state!=STATE_ACTIVE || ArraySize(g_blocks)>0)
      {
       if(reviewing)
          g_guardSkipsToday++;
+      RecordStrategyCheck(signal,occupied,g_state!=STATE_ACTIVE ? "robot is not active" : "operational guard blocked entry");
       return;
      }
 
-   if(atr<=0 || riskFactor<=0)
+   if(!sizeOk)
+     {
+      if(reviewing) g_sizeSkipsToday++;
+      RecordStrategyCheck(signal,occupied,"sizing rejected entry");
+      Event("info","Skipped a plan signal: "+info);
       return;
-   double risk=g_guards.Initial()*InpRiskPercent/100.0*riskFactor;
-   string info;
+     }
    bool sent=false;
    bool opened=g_trader.Open((int)signal,stopPrice,4.0*atr,InpTargetR,risk,
                              InpMaxLots,"XAU plan "+ROBOT_VERSION,info,sent);
@@ -705,9 +736,14 @@ void OnNewBar(void)
       // Only the broker's DEAL_ENTRY_IN confirms a fill. The transaction
       // callback below counts it and sends the Telegram trade notification.
       Print("[Office] Entry order accepted: ",info,". Waiting for the fill.");
+      RecordStrategyCheck(signal,occupied,"order accepted; waiting for fill",true);
      }
    else
+     {
+      if(!sent && reviewing) g_sizeSkipsToday++;
+      RecordStrategyCheck(signal,occupied,sent ? "broker rejected order" : "quote or sizing changed before entry");
       Event(sent ? "error" : "info","Skipped a plan signal: "+info);
+     }
   }
 
 void ReviewNoTradeDay(void)
@@ -721,9 +757,9 @@ void ReviewNoTradeDay(void)
    g_reviewSentDay=today;
    if(g_guards.TradesToday()>0)
       return;
-   Event("info",StringFormat("No XAUUSD trade in today's NY session: %d completed M15 checks since this EA started, %d trend waits, %d pattern waits, %d guarded signals. Last check: %s. A trade is never forced just to meet the daily goal.",
+   Event("info",StringFormat("No XAUUSD trade in today's NY session: %d completed M15 checks since this EA started, %d trend waits, %d pattern waits, %d guarded signals, %d sizing waits. Last check: %s. No daily entry is forced.",
                         g_checksToday,g_trendWaitsToday,g_patternWaitsToday,
-                        g_guardSkipsToday,g_strategy.Check()));
+                         g_guardSkipsToday,g_sizeSkipsToday,g_strategy.Check()));
   }
 
 //+------------------------------------------------------------------+

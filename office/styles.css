@@ -701,3 +701,30 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
   .bubble span { animation: none; }
 }
+
+.entry-diagnostics { display:grid; gap:12px; padding:14px; border:1px solid #303b49; border-radius:12px; background:#111820; font-size:12px; }
+.readiness { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.readiness > span { display:grid; gap:5px; padding:10px; border-radius:8px; background:#1b2632; }
+.readiness b { color:#aab6c4; font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
+.entry-diagnostics .pass { color:#79d6b0; }
+.entry-diagnostics .wait { color:#efc17b; }
+.entry-diagnostics .unevaluated { color:#8c98a8; }
+.diagnostic-time,.diagnostic-note,.diagnostic-empty,.entry-diagnostics small { color:#96a4b5; line-height:1.5; margin:0; }
+.diagnostic-decision { margin:0; line-height:1.5; overflow-wrap:anywhere; }
+.size-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 8px; margin:0; }
+.size-grid dt { color:#96a4b5; font-size:10px; }
+.size-grid dd { margin:4px 0 0; font-size:15px; font-weight:600; }
+.entry-diagnostics details { min-width:0; }
+.entry-diagnostics summary { cursor:pointer; min-height:40px; display:list-item; align-content:center; color:#d0d9e5; }
+.gate-list { list-style:none; padding:0; margin:8px 0 12px; display:grid; gap:8px; }
+.gate-list li { display:flex; gap:12px; justify-content:space-between; }
+.gate-list b { white-space:nowrap; font-size:10px; }
+.indicator-scroll { overflow-x:auto; margin:12px 0; }
+.indicator-scroll table { width:100%; border-collapse:collapse; font-size:10px; font-variant-numeric:tabular-nums; }
+.indicator-scroll th,.indicator-scroll td { padding:7px 4px; text-align:right; white-space:nowrap; border-bottom:1px solid #2b3643; }
+.indicator-scroll th:first-child { text-align:left; }
+.check-history { list-style:none; padding:0; display:grid; gap:12px; }
+.check-history li { display:grid; gap:4px; }
+.check-history time { color:#96a4b5; font-size:10px; }
+.check-history span { color:#b7c3d1; line-height:1.5; }
+@media(max-width:420px) { .entry-diagnostics { padding:10px; } .gate-list li { font-size:11px; } }

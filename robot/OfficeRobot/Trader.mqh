@@ -16,6 +16,12 @@ private:
    CTrade            m_trade;
    string            m_symbol;
    long              m_magic;
+   bool              m_planAvailable,m_planReady;
+   double            m_entry,m_stop,m_target,m_distance,m_minRisk,m_risk,m_rawVolume,m_volume,m_minVolume;
+   string            m_planReason;
+
+   bool FailPlan(const string reason,string &info)
+     { m_planReady=false; m_planReason=reason; info=reason; return false; }
 
    // Is the currently selected position one of ours?
    bool              Mine(void)
@@ -24,9 +30,24 @@ private:
      }
 
 public:
+   void ResetPlan(void)
+     {
+      m_planAvailable=m_planReady=false; m_entry=m_stop=m_target=m_distance=m_minRisk=m_risk=m_rawVolume=m_volume=m_minVolume=0;
+      m_planReason="No confirmed signal to size";
+     }
+   string PlanJson(void)
+     {
+      return "{"+JKey("available")+JBool(m_planAvailable)+","+JKey("feasible")+JBool(m_planReady)
+       +","+JKey("entry")+JNum(m_entry,5)+","+JKey("stop")+JNum(m_stop,5)+","+JKey("target")+JNum(m_target,5)
+       +","+JKey("stop_distance")+JNum(m_distance,5)+","+JKey("minimum_lot_risk")+JNum(m_minRisk,5)
+       +","+JKey("risk_budget")+JNum(m_risk,5)+","+JKey("raw_volume")+JNum(m_rawVolume,8)
+       +","+JKey("calculated_volume")+JNum(m_volume,8)+","+JKey("minimum_volume")+JNum(m_minVolume,8)
+       +","+JKey("reason")+JStr(m_planReason)+"}";
+     }
    void              Init(const string symbol,const long magic,const int slippagePoints)
      {
       m_symbol=symbol;
+      ResetPlan();
       m_magic=magic;
       m_trade.SetExpertMagicNumber((ulong)magic);
       m_trade.SetDeviationInPoints((ulong)slippagePoints);
@@ -109,18 +130,16 @@ public:
       return "["+out+"]";
      }
 
-   // Opens one trade sized so that hitting the stop loses riskMoney.
-   // sent is true when an order actually went to the server.
-   bool              Open(const int direction,const double stopPrice,const double maxStopDistance,
+   // Pure broker pricing preview: no order is sent. Open uses the same path.
+   bool              Preview(const int direction,const double stopPrice,const double maxStopDistance,
                           const double targetR,const double riskMoney,const double maxAllowedLots,
-                          const string comment,string &info,bool &sent)
+                          string &info)
      {
-      sent=false;
+      ResetPlan(); m_planAvailable=true; m_risk=riskMoney;
       MqlTick tick;
       if(!SymbolInfoTick(m_symbol,tick))
         {
-         info="no price yet";
-         return false;
+         return FailPlan("no price yet",info);
         }
       int digits=(int)SymbolInfoInteger(m_symbol,SYMBOL_DIGITS);
       double point=SymbolInfoDouble(m_symbol,SYMBOL_POINT);
@@ -130,52 +149,66 @@ public:
       ENUM_ORDER_TYPE type=buy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
       double entry=buy ? tick.ask : tick.bid;
       double stopDistance=buy ? entry-stopPrice : stopPrice-entry;
+      m_entry=entry; m_stop=NormalizeDouble(stopPrice,digits); m_distance=stopDistance;
       if(stopDistance<=0 || stopDistance>maxStopDistance)
         {
-         info="price moved too far from the planned structural stop";
-         return false;
+         return FailPlan("price moved too far from the planned structural stop",info);
         }
       if(stopDistance<minStop+2*point)
         {
-         info="stop would be too close to the price";
-         return false;
+         return FailPlan("stop would be too close to the price",info);
         }
       double sl=NormalizeDouble(stopPrice,digits);
       double tp=NormalizeDouble(buy ? entry+stopDistance*targetR : entry-stopDistance*targetR,digits);
+      m_target=tp;
 
       // What one lot would lose at the stop, in account currency.
       double lossPerLot=0;
       if(!OrderCalcProfit(type,m_symbol,1.0,entry,sl,lossPerLot) || lossPerLot>=0)
         {
-         info="could not price the stop";
-         return false;
+         return FailPlan("could not price the stop",info);
         }
       double step=SymbolInfoDouble(m_symbol,SYMBOL_VOLUME_STEP);
       double minLots=SymbolInfoDouble(m_symbol,SYMBOL_VOLUME_MIN);
       double maxLots=SymbolInfoDouble(m_symbol,SYMBOL_VOLUME_MAX);
-      double lots=MathFloor(riskMoney/(-lossPerLot)/step)*step;
+      m_minVolume=minLots; m_minRisk=(-lossPerLot)*minLots;
+      if(step<=0 || minLots<=0 || riskMoney<=0) return FailPlan("invalid broker volume or risk budget",info);
+      m_rawVolume=riskMoney/(-lossPerLot);
+      double lots=MathFloor((m_rawVolume+1e-10)/step)*step;
+      m_volume=lots;
       if(lots<minLots)
         {
-         info=StringFormat("the risk per trade is too small for the minimum size (%.2f lots)",minLots);
-         return false;
+         return FailPlan(StringFormat("minimum %.2f lot risks %.2f; budget %.2f: size rejected",minLots,m_minRisk,riskMoney),info);
         }
       lots=MathMin(lots,MathMin(maxLots,maxAllowedLots));
       lots=MathFloor(lots/step)*step;
       if(lots<minLots)
         {
-         info="lot cap is below the broker's minimum size";
-         return false;
+         m_volume=lots; return FailPlan("lot cap is below the broker's minimum size",info);
         }
       int volumeDigits=(int)MathMax(0,MathRound(-MathLog10(step)));
       lots=NormalizeDouble(lots,volumeDigits);
+      m_volume=lots;
+      if((-lossPerLot)*lots>riskMoney+1e-7) return FailPlan("rounded volume exceeds the risk budget",info);
 
       double margin=0;
       if(OrderCalcMargin(type,m_symbol,lots,entry,margin) && margin>AccountInfoDouble(ACCOUNT_MARGIN_FREE)*0.9)
         {
-         info="not enough free margin";
-         return false;
+         return FailPlan("not enough free margin",info);
         }
-
+      m_planReady=true; m_planReason="size fits the risk budget (before fees)"; info=m_planReason; return true;
+     }
+   // sent is true only when an order actually went to the server.
+   bool Open(const int direction,const double stopPrice,const double maxStopDistance,
+             const double targetR,const double riskMoney,const double maxAllowedLots,
+             const string comment,string &info,bool &sent)
+     {
+      sent=false;
+      if(!Preview(direction,stopPrice,maxStopDistance,targetR,riskMoney,maxAllowedLots,info)) return false;
+      bool buy=direction>0; int digits=(int)SymbolInfoInteger(m_symbol,SYMBOL_DIGITS);
+      double lots=m_volume,sl=m_stop,tp=m_target;
+      double step=SymbolInfoDouble(m_symbol,SYMBOL_VOLUME_STEP);
+      int volumeDigits=(int)MathMax(0,MathRound(-MathLog10(step)));
       sent=true;
       bool ok=buy ? m_trade.Buy(lots,m_symbol,0.0,sl,tp,comment)
                   : m_trade.Sell(lots,m_symbol,0.0,sl,tp,comment);
@@ -184,6 +217,7 @@ public:
                  && code!=TRADE_RETCODE_PLACED))
         {
          info=StringFormat("order rejected: %s",m_trade.ResultRetcodeDescription());
+         m_planReason=info;
          return false;
         }
       info=StringFormat("%s %s lots %s, stop %s, target %s",buy ? "BUY" : "SELL",

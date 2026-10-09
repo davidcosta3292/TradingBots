@@ -1,0 +1,14 @@
+.git/
+.local/
+.claude/
+node_modules/
+news/
+plan/
+research/
+robot/
+supabase/
+tools/
+.vercel/
+.env*
+office/.vercel/**
+office/.env*

@@ -3,10 +3,11 @@
 // robot's owner can press Start, Pause, Done for today and Close everything;
 // the robot confirms each press. Add ?demo to the address to preview with
 // sample robots, no Supabase needed.
-import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=11';
+import { MOODS, moodOf, readBlocks, resumeNote } from './moods.js?v=12';
 import { COLORS, EYES, GEAR, lookOf } from './looks.js?v=8';
 import { ASSIGNMENTS, assignmentOf, isTrader, isAnalyst } from './assignments.js?v=12';
 import { play, setSound, soundOn } from './sounds.js?v=5';
+import { diagnosticsCard } from './diagnostics.js?v=1';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const VIEW_KEY = 'trading-office-view';
@@ -45,6 +46,7 @@ const store = {
   lastCommand: new Map(), // robot id -> newest command
   events: new Map(),      // robot id -> newest events first
   deals: new Map(),       // robot id -> deals, oldest first
+  checks: new Map(),      // robot id -> structured M15 diagnostics, newest first
 };
 let sb = null;
 let view = 'cards';
@@ -187,7 +189,7 @@ function setView(next) {
 }
 
 function loadOffice() {
-  officeLoading ??= import('./scene.js?v=15')
+  officeLoading ??= import('./scene.js?v=16')
     .then(({ createOfficeScene }) => {
       office = createOfficeScene($('scene'), {
         onSelect: select,
@@ -262,14 +264,15 @@ function panelInsets() {
 
 async function loadAll() {
   const since = new Date(Date.now() - (HISTORY_DAYS + 1) * 86_400_000).toISOString();
-  const [members, robots, commands, events, deals] = await Promise.all([
+  const [members, robots, commands, events, deals, checks] = await Promise.all([
     sb.from('office_members').select('user_id, display_name'),
     sb.from('robots').select('*'),
     sb.from('commands').select('*').order('id', { ascending: false }).limit(100),
     sb.from('robot_events').select('*').order('id', { ascending: false }).limit(200),
     sb.from('deals').select('*').gte('deal_time', since).order('deal_time').limit(2000),
+    sb.from('strategy_checks').select('*').order('bar_at', {ascending:false}).limit(200),
   ]);
-  for (const result of [members, robots, commands, events, deals]) {
+  for (const result of [members, robots, commands, events, deals, checks]) {
     if (result.error) throw result.error;
   }
   members.data.forEach((m) => store.members.set(m.user_id, m.display_name));
@@ -283,10 +286,22 @@ async function loadAll() {
     store.events.set(e.robot_id, list);
   });
   deals.data.forEach(addDeal);
+  store.checks.clear();
+  checks.data.forEach(addCheck);
+}
+
+function addCheck(row) {
+  const list=store.checks.get(row.robot_id)||[];
+  const rows=[row,...list.filter(r=>r.bar_at!==row.bar_at || r.version!==row.version)]
+    .sort((a,b)=>Date.parse(b.bar_at)-Date.parse(a.bar_at)).slice(0,30);
+  store.checks.set(row.robot_id,rows);
 }
 
 function subscribe() {
   sb.channel('office')
+    .on('postgres_changes', {event:'INSERT',schema:'public',table:'strategy_checks'}, ({new:row})=>{
+      if(row?.robot_id) { addCheck(row); render(); }
+    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'robots' }, (change) => {
       if (change.eventType === 'DELETE' && change.old?.id) forgetRobot(change.old.id);
       else if (change.new?.id) store.robots.set(change.new.id, change.new);
@@ -587,6 +602,7 @@ function forgetRobot(id) {
   store.lastCommand.delete(id);
   store.events.delete(id);
   store.deals.delete(id);
+  store.checks.delete(id);
   openLooks.delete(id);
   if (selectedId === id) selectedId = null;
   if (newRobotToken?.id === id) newRobotToken = null;
@@ -641,7 +657,9 @@ function sortedRobots() {
 
 function setHTML(element, html) {
   if (htmlCache.get(element) === html) return;
+  const expanded=new Set([...element.querySelectorAll('details[open][data-detail]')].map(d=>d.dataset.detail));
   element.innerHTML = html;
+  element.querySelectorAll('details[data-detail]').forEach(d=>{d.open=expanded.has(d.dataset.detail);});
   htmlCache.set(element, html);
 }
 
@@ -769,12 +787,13 @@ function card(r) {
       : `<p class="viewonly">Only ${esc(owner)} can control this robot. FTMO allows nobody else to use their account.</p>`}
     ${command ? commandLine(command) : ''}
     ${s.exercise_mode ? `<p class="exercise-note"><b>Demo exercise</b> · EMA bias on closed M1 bars · timed exit after ${esc(s.exercise_hold_minutes ?? 3)} min or stop/target · ${esc(s.risk_pct ?? 0.05)}% risk per entry. This is an execution check, not a validated strategy.</p>` : ''}
-    ${s.signal_check ? `<div class="plan-note"><b>XAUUSD demo · full plan + continuation</b>
+    ${s.signal_check ? `<div class="plan-note"><b>${s.strategy_check ? 'XAUUSD demo · calibrated structure' : 'XAUUSD demo · full plan + continuation'}</b>
       <span>${esc(s.trends || 'Waiting for trend data')}</span>
       <span>${esc(s.signal_check)}</span>
       <small>Full setup up to ${esc(s.risk_pct ?? 0.1)}% risk · continuation half risk · ${esc(s.target_r ?? 3)}R target · ${esc(s.max_hold_hours ?? 6)}h maximum hold · ${esc(s.loss_streak ?? 0)} losses in a row</small>
-      ${s.checks_today != null ? `<small>NY session since EA start: ${esc(s.checks_today)} M15 checks · ${esc(s.trend_waits_today ?? 0)} trend waits · ${esc(s.pattern_waits_today ?? 0)} setup waits · ${esc(s.guard_skips_today ?? 0)} guarded signals</small>` : ''}
+      ${s.checks_today != null ? `<small>NY session since EA start: ${esc(s.checks_today)} M15 checks · ${esc(s.trend_waits_today ?? 0)} trend waits · ${esc(s.pattern_waits_today ?? 0)} setup waits · ${esc(s.guard_skips_today ?? 0)} guarded signals · ${esc(s.size_skips_today ?? 0)} sizing rejections</small>` : ''}
     </div>` : ''}
+    ${diagnosticsCard(r,store.checks.get(r.id)||[],online)}
 
     ${positions.length
       ? positions.map((p) => positionRow(p, r, currency)).join('')
@@ -1039,6 +1058,16 @@ function loadDemo() {
     status: { ...base, equity: 24912.7, day_pnl: -87.3, trades_today: 2, daily_used_pct: 7, max_used_pct: 3.5, can_trade: false,
       positions: [], blocks: ['news: USD Non-Farm Employment Change at 14:30 Prague'], last_action: '14:02 Closed by stop loss: -87.30' },
   });
+  const sampleCheck={at:Math.floor(now/900000)*900,checked_at:Math.floor(now/1000),version:'1.3.0',signal_ready:true,
+    operational_permission:false,position_free:true,order_eligible:false,decision:'sizing rejected entry',
+    strategy:{data_ready:true,mode:'rebound',direction:1,reason:'BUY rebound: anchored continuation; half risk',
+      ema_reaction:4183.04,ema_confirmation:4183.61,atr_reaction:6.2,atr_confirmation:6.32,rebound_level:4185.57,protected_level:4121.07,
+      indicators:{D1:{ready:true,close:4132.72,fast:4224.60,slow:4278.55},H4:{ready:true,close:4175.33,fast:4164.67,slow:4262.12},H1:{ready:true,close:4190.12,fast:4169.65,slow:4151.98},M15:{ready:true,close:4188.99,fast:4183.61,slow:4177.47}},
+      gates:{trend:true,m15_alignment:true,candle_shape:true,bos:false,structure_held:null,zone:false,reaction:true,confirmation:true,continuation_window:true,continuation_pullback:true,continuation:true}},
+    sizing:{available:true,feasible:false,entry:4189.19,stop:4173.092,target:4237.48,stop_distance:16.098,minimum_lot_risk:16.098,risk_budget:12.5,raw_volume:0.007765,calculated_volume:0,minimum_volume:0.01,reason:'Minimum 0.01 lot risks $16.10; budget $12.50'}};
+  store.robots.get('r2').status.strategy_check=sampleCheck;
+  store.robots.get('r2').status.signal_ready=true;
+  addCheck({robot_id:'r2',bar_at:new Date(sampleCheck.at*1000).toISOString(),version:'1.3.0',payload:sampleCheck});
   store.robots.set('r3', {
     id: 'r3', name: 'Fundamental Analyst', assignment: 'analyst', owner_id: 'me',
     state: 'active', last_report_at: iso(5000), look: {},

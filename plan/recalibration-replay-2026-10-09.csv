@@ -1,0 +1,8 @@
+variant,checks,trend_waits,pattern_waits,signals,size_rejections,wins,losses,time_exits,pending,risk_units
+baseline,161,11,132,18,14,0,4,0,0,-4.0
+trend_only,161,7,136,18,14,0,4,0,0,-4.0
+reference_only,163,11,136,16,13,0,3,0,0,-3.0
+zone_only,161,11,133,17,13,0,4,0,0,-4.0
+pivot_only,161,11,133,17,13,0,4,0,0,-4.0
+trend_reference,163,7,140,16,13,0,3,0,0,-3.0
+combined,163,7,140,16,13,0,3,0,0,-3.0

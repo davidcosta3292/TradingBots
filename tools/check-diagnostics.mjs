@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { diagnosticsCard } from '../office/diagnostics.js';
+const check = {at:Date.now()/1000,version:'1.3.0',signal_ready:true,decision:'<script>bad</script>',strategy:{data_ready:true,mode:'rebound',gates:{trend:true,zone:false,bos:null},indicators:{H4:{ready:true,close:4175,fast:4165,slow:4262}}},sizing:{available:true,feasible:false,stop_distance:16.10,minimum_lot_risk:16.10,risk_budget:12.50,calculated_volume:0,minimum_volume:.01,reason:'minimum exceeds budget'}};
+const robot={id:'test',state:'active',status:{can_trade:true,signal_ready:true,strategy_check:check}};
+const html=diagnosticsCard(robot);
+assert(html.includes('Allowed'));
+assert(html.includes('Pattern confirmed'));
+assert(html.includes('$12.50'));
+assert(html.includes('Not evaluated'));
+assert(html.includes('&lt;script&gt;'));
+assert(!html.includes('<script>'));
+assert(diagnosticsCard(robot,[],false).includes('Blocked or paused'));
+assert.equal(diagnosticsCard({status:{}}),'');
+console.log('Diagnostics rendering: permission/signal separation, sizing, null gates and escaping passed');

@@ -1,0 +1,13 @@
+decision_sao_paulo,decision_new_york,H4_close,H4_EMA50,H4_EMA200,trend_gate_pass,original_signal,buy_full_pattern_only,sell_full_pattern_only,buy_continuation_pattern_only,sell_continuation_pattern_only
+09:00,08:00,4187.68,4164.232010746357,4262.992021172358,False,,False,False,False,False
+09:15,08:15,4187.68,4164.232010746357,4262.992021172358,False,,False,False,False,False
+09:30,08:30,4187.68,4164.232010746357,4262.992021172358,False,,False,False,False,False
+09:45,08:45,4187.68,4164.232010746357,4262.992021172358,False,,False,False,False,False
+10:00,09:00,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,True
+10:15,09:15,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,False
+10:30,09:30,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,False
+10:45,09:45,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,False
+11:00,10:00,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,False
+11:15,10:15,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,False
+11:30,10:30,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,False
+11:45,10:45,4175.33,4164.667226011206,4262.119762255221,False,,False,False,False,False

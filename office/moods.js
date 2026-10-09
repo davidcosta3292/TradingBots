@@ -99,7 +99,12 @@ export function moodOf(robot, now = Date.now()) {
   if (inTrade) return { key: 'trade', label: 'In a trade', block: null, inTrade };
   const block = s.can_trade === false ? readBlocks(s.blocks) : null;
   if (block) return { key: block.needsYou ? 'blocked' : 'standby', label: block.label, block, inTrade };
-  return { key: 'active', label: 'Working', block: null, inTrade };
+  if (s.strategy_check?.strategy?.data_ready === false)
+    return {key:'blocked',label:'Waiting for candle data',block:null,inTrade};
+  if (s.signal_ready === false) return {key:'active',label:'Looking for a setup',block:null,inTrade};
+  if (s.strategy_check?.sizing?.available && s.strategy_check.sizing.feasible === false)
+    return {key:'active',label:'Size not feasible',block:null,inTrade};
+  return { key: 'active', label: s.signal_ready === true ? 'Checking entry' : 'Working', block: null, inTrade };
 }
 
 // " (03:00 your time)" for a Prague clock time, or "" when it's the same here.

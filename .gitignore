@@ -10,3 +10,8 @@ compile.log
 # Local news watcher credentials
 news/config.json
 news/*.log
+.local/
+supabase/.temp/
+.vercel/
+
+.env*
