@@ -43,4 +43,3 @@ alter publication supabase_realtime add table public.strategy_checks;
 select cron.schedule('strategy-check-retention', '17 3 * * *',
   $$delete from public.strategy_checks where bar_at < now() - interval '30 days'$$);
 commit;
-
