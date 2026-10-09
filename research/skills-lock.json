@@ -1,0 +1,157 @@
+{
+  "reviewed_at": "2026-10-09",
+  "source_snapshots": {
+    "pstack": [
+      "backnotprop/pstack",
+      "3a604672c46cd8187d2b19980eae0a34f9f91138"
+    ],
+    "agent-skills": [
+      "addyosmani/agent-skills",
+      "1401c8b8030e023baeebb31781a6653fe8e93026"
+    ],
+    "SwiftUI-Agent-Skill": [
+      "twostraws/SwiftUI-Agent-Skill",
+      "f9800713b24580bc444931949aad4519128605e8"
+    ],
+    "daily_stock_analysis": [
+      "ZhuLinsen/daily_stock_analysis",
+      "ce364e457aab288863a5707e7b3df79786ad07f2"
+    ]
+  },
+  "installed_skills": [
+    {
+      "repository": "backnotprop/pstack",
+      "commit": "3a604672c46cd8187d2b19980eae0a34f9f91138",
+      "skill": "principle-model-the-domain",
+      "license": "MIT",
+      "local_adaptations": [
+        "Moved unsupported invocation flag to upstream metadata; normal Codex selection remains enabled"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\principle-model-the-domain",
+      "entry_sha256": "2f765b097c60e892dd4ef79293542e54af9ebb9cb89b728a8a0a1861df9d3b44"
+    },
+    {
+      "repository": "backnotprop/pstack",
+      "commit": "3a604672c46cd8187d2b19980eae0a34f9f91138",
+      "skill": "principle-make-operations-idempotent",
+      "license": "MIT",
+      "local_adaptations": [
+        "Moved unsupported invocation flag to upstream metadata; normal Codex selection remains enabled"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\principle-make-operations-idempotent",
+      "entry_sha256": "4852cfbb704f8baad174c29bf1c2fc1dace9dad0078da3434ec514ecc548d420"
+    },
+    {
+      "repository": "backnotprop/pstack",
+      "commit": "3a604672c46cd8187d2b19980eae0a34f9f91138",
+      "skill": "principle-fix-root-causes",
+      "license": "MIT",
+      "local_adaptations": [
+        "Moved unsupported invocation flag to upstream metadata; normal Codex selection remains enabled"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\principle-fix-root-causes",
+      "entry_sha256": "99471630b0f6dedd5842ef5813b1f57e8c3651ae5006fbb0d212d452eca610e1"
+    },
+    {
+      "repository": "backnotprop/pstack",
+      "commit": "3a604672c46cd8187d2b19980eae0a34f9f91138",
+      "skill": "principle-explain-the-number",
+      "license": "MIT",
+      "local_adaptations": [
+        "Moved unsupported invocation flag to upstream metadata; normal Codex selection remains enabled"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\principle-explain-the-number",
+      "entry_sha256": "02a01539ac35fce59e169eb7868e6ae3966859e6be32cfe58881f7c599727f9f"
+    },
+    {
+      "repository": "backnotprop/pstack",
+      "commit": "3a604672c46cd8187d2b19980eae0a34f9f91138",
+      "skill": "principle-prove-it-works",
+      "license": "MIT",
+      "local_adaptations": [
+        "Moved unsupported invocation flag to upstream metadata; normal Codex selection remains enabled"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\principle-prove-it-works",
+      "entry_sha256": "989dcffd1c66eefedee95a07369b637c6da949fb41cb4f99f82766e9e881b2ef"
+    },
+    {
+      "repository": "backnotprop/pstack",
+      "commit": "3a604672c46cd8187d2b19980eae0a34f9f91138",
+      "skill": "benchmark-checklist",
+      "license": "MIT",
+      "local_adaptations": [
+        "Moved unsupported invocation flag to upstream metadata; normal Codex selection remains enabled"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\benchmark-checklist",
+      "entry_sha256": "6a77f07d9c1ba0a651d0639596b0b4ea81fd1830d3c046587680d27f264f4733"
+    },
+    {
+      "repository": "addyosmani/agent-skills",
+      "commit": "1401c8b8030e023baeebb31781a6653fe8e93026",
+      "skill": "debugging-and-error-recovery",
+      "license": "MIT",
+      "local_adaptations": [],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\debugging-and-error-recovery",
+      "entry_sha256": "21f3960f5d7ae2cc95c40896545004dbbcbbd752ea65fc2d53962554d4174220"
+    },
+    {
+      "repository": "addyosmani/agent-skills",
+      "commit": "1401c8b8030e023baeebb31781a6653fe8e93026",
+      "skill": "observability-and-instrumentation",
+      "license": "MIT",
+      "local_adaptations": [
+        "Bundled the shared checklist and made its reference local"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\observability-and-instrumentation",
+      "entry_sha256": "29baa9f93e08b601927f1037a973a51ad2c1797a54c7134cbaf78a55fecf394a"
+    },
+    {
+      "repository": "addyosmani/agent-skills",
+      "commit": "1401c8b8030e023baeebb31781a6653fe8e93026",
+      "skill": "performance-optimization",
+      "license": "MIT",
+      "local_adaptations": [
+        "Bundled the shared checklist and made its reference local"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\performance-optimization",
+      "entry_sha256": "2e7713dbea28c3ba8d6a8d9aba4a725674dd87146cfe9e6ef0f9b4154237c6ac"
+    },
+    {
+      "repository": "twostraws/SwiftUI-Agent-Skill",
+      "commit": "f9800713b24580bc444931949aad4519128605e8",
+      "skill": "swiftui-pro",
+      "license": "MIT",
+      "local_adaptations": [
+        "Moved duplicate plugin skill entry to a reference file"
+      ],
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\swiftui-pro",
+      "entry_sha256": "c88c396456ccd3e1feb18070283352fd8db1c92c0a64ae59d7fe0032674c0129"
+    },
+    {
+      "skill": "market-research-evidence",
+      "source": "skills/market-research-evidence",
+      "type": "project-authored synthesis",
+      "source_repositories": {
+        "pstack": [
+          "backnotprop/pstack",
+          "3a604672c46cd8187d2b19980eae0a34f9f91138"
+        ],
+        "agent-skills": [
+          "addyosmani/agent-skills",
+          "1401c8b8030e023baeebb31781a6653fe8e93026"
+        ],
+        "SwiftUI-Agent-Skill": [
+          "twostraws/SwiftUI-Agent-Skill",
+          "f9800713b24580bc444931949aad4519128605e8"
+        ],
+        "daily_stock_analysis": [
+          "ZhuLinsen/daily_stock_analysis",
+          "ce364e457aab288863a5707e7b3df79786ad07f2"
+        ]
+      },
+      "installed_path": "C:\\Users\\david\\.codex\\skills\\market-research-evidence",
+      "entry_sha256": "8f8e63ee37c8a09d8081661c91d58ac9b7a76f4cdfba803dded074fd7c9c6236"
+    }
+  ],
+  "scope": "Static skills only; no stock-analysis service or trading changes deployed"
+}
