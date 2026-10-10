@@ -23,7 +23,7 @@ Supabase Edge Function     ──news reports─►    ▲
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run migrations `0001` to `0010` in order, then `0012` for owner-controlled deletion. Migration `0011` schedules this project's Analyst function and requires its Vault token first; its URL and public key must be changed for another Supabase project.
+2. **SQL Editor:** run migrations `0001` to `0010` in order, then `0012` for owner-controlled deletion. Apply the timestamped migrations afterward, in filename order, for M15 diagnostics and Analyst evidence/history. Migration `0011` schedules this project's Analyst function and requires its Vault token first; its URL and public key must be changed for another Supabase project.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in. An office member can create up to six slots from the hosted page; administrators can also use the helpers below:
@@ -93,7 +93,7 @@ In the office, where a robot is tells you what it's doing:
 
 ### Fundamental Analyst · economic news
 
-The Fundamental Analyst watches the Forex Factory calendar and public Investing.com, Bloomberg and WSJ/Dow Jones RSS feeds for USD releases and headlines relevant to XAUUSD. It is a separate, read-only program. It does not connect to MetaTrader, trade, or control the Trader EA. Its office card shows upcoming events, linked headlines and source health. Important observations can also reach the same Telegram bot's private chat and group, with a 30-minute alert limit. The Trader EA still uses its own MT5 news guard.
+The Fundamental Analyst watches the Forex Factory calendar and public Investing.com, Bloomberg and WSJ/Dow Jones RSS feeds for USD releases and headlines relevant to XAUUSD. It is a separate, read-only program. Its **1.2-server** card shows a cited evidence report, reassessment conditions, source availability and content freshness. Publication, scheduled-event and fetch times are distinct; missing time zones stay unverified. Converted times are labeled New York. **Report history** loads the latest 12 frozen snapshots on demand, retained for 30 days. Important observations can reach the same Telegram bot's private chat and group, with a 30-minute alert limit; urgent headline alerts require a verified publication time within the last hour. These are deterministic title/calendar reports, with gold direction explicitly unknown. They do not read full articles, predict trades, connect to MetaTrader or control the EA. The Trader EA still uses its own MT5 news guard.
 
 David's **Fundamental Analyst** runs as a Supabase Edge Function called every five minutes by `pg_cron` and `pg_net`. Its token is encrypted in Supabase Vault, never in the Vercel website or GitHub. The old local process has been stopped. The office marks the Analyst offline after 12 minutes without a report and sends the usual Telegram offline alert. Turning off David's PC does not stop this Analyst.
 

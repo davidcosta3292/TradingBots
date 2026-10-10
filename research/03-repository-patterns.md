@@ -79,6 +79,8 @@ The news watcher currently filters headlines by keywords; it does not read full 
 
 ## Where to start
 
+**Follow-up, 9 October:** The Analyst evidence slice is now implemented in `1.2-server`: explicit timing/freshness, cited reports, reassessment conditions and immutable report history. See [the deployment note](../plan/analyst-evidence-upgrade.md). The other items below remain proposals.
+
 The first useful engineering slice is source freshness and provenance for the existing Fundamental Analyst, paired with a decision-chain view for Trader diagnostics. Both improve what the office can explain. They do not require a new trading platform, an upstream stock strategy, or a new VPS. Keep the deterministic EA responsible for execution and FTMO guards.
 
 New project guidance is in [AGENTS.md](../AGENTS.md). The source snapshots remain in ignored `.local/repo-learning-2026-10-09/`; the production office excludes `research/`, `skills/` and `tools/` from upload.

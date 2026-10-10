@@ -1,16 +1,15 @@
 // Scheduled, read-only XAUUSD news watcher. The caller must present the
 // Analyst token; it is checked against robot_secrets before any feeds are read.
+import { VERSION, sha256, parseSourceTime, headlineFreshness, relevanceOf, canonicalUrl, storyKey, buildReport } from './evidence.ts';
+import type { Source, Item, FeedHealth } from './evidence.ts';
 const SOURCES = [
-  { name: 'Investing.com', url: 'https://www.investing.com/rss/news_95.rss', host: 'investing.com' },
-  { name: 'Investing.com', url: 'https://www.investing.com/rss/news_11.rss', host: 'investing.com' },
-  { name: 'Bloomberg', url: 'https://feeds.bloomberg.com/economics/news.rss', host: 'bloomberg.com' },
-  { name: 'WSJ', url: 'https://feeds.content.dowjones.io/public/rss/socialeconomyfeed', host: 'wsj.com' },
-  { name: 'Forex Factory', url: 'https://nfs.faireconomy.media/ff_calendar_thisweek.json', host: 'forexfactory.com' },
-];
-const STRONG = /\b(gold|xau|fed|fomc|powell|inflation|cpi|pce|nonfarm|payrolls?|treasur(?:y|ies)|bond yields?|interest rates?|rate cuts?|central banks?|us dollar|dollar index|usd|tariffs?|geopolitic\w*|war|middle east)\b/i;
-const MEDIUM = /\b(united states|u\.s\.|china|gdp|jobs?|employment|unemployment|recession|consumer confidence|oil|commodit\w*)\b/i;
+  { id: 'investing-commodities', name: 'Investing.com', kind: 'headline', url: 'https://www.investing.com/rss/news_95.rss', host: 'investing.com' },
+  { id: 'investing-economy', name: 'Investing.com', kind: 'headline', url: 'https://www.investing.com/rss/news_11.rss', host: 'investing.com' },
+  { id: 'bloomberg-economics', name: 'Bloomberg', kind: 'headline', url: 'https://feeds.bloomberg.com/economics/news.rss', host: 'bloomberg.com' },
+  { id: 'wsj-economy', name: 'WSJ', kind: 'headline', url: 'https://feeds.content.dowjones.io/public/rss/socialeconomyfeed', host: 'wsj.com' },
+  { id: 'forexfactory-week', name: 'Forex Factory', kind: 'calendar', url: 'https://nfs.faireconomy.media/ff_calendar_thisweek.json', host: 'forexfactory.com' },
+] satisfies Source[];
 const nowIso = () => new Date().toISOString();
-const relevance = (text: string) => STRONG.test(text) ? 2 : MEDIUM.test(text) ? 1 : 0;
 const response = (data: unknown, status = 200) => Response.json(data, { status });
 
 function environmentKeys() {
@@ -28,10 +27,6 @@ function headersFor(key: string) {
     ...(key.startsWith('eyJ') ? { Authorization: `Bearer ${key}` } : {}),
   };
 }
-async function sha256(value: string) {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return [...new Uint8Array(bytes)].map((x) => x.toString(16).padStart(2, '0')).join('');
-}
 async function authorized(token: string, url: string, adminKey: string) {
   const hash = await sha256(token);
   const lookup = await fetch(`${url}/rest/v1/robot_secrets?select=robot_id&token_hash=eq.${hash}&limit=1`, {
@@ -47,9 +42,10 @@ async function authorized(token: string, url: string, adminKey: string) {
   return (await robot.json())[0]?.assignment === 'analyst';
 }
 function decodeXml(text: string) {
+  const point = (n: number) => Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '\uFFFD';
   return String(text || '').replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, '$1')
-    .replace(/&#x([0-9a-f]+);/gi, (_: string, n: string) => String.fromCodePoint(parseInt(n, 16)))
-    .replace(/&#([0-9]+);/g, (_: string, n: string) => String.fromCodePoint(parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_: string, n: string) => point(parseInt(n, 16)))
+    .replace(/&#([0-9]+);/g, (_: string, n: string) => point(parseInt(n, 10)))
     .replace(/&(amp|lt|gt|quot|apos|nbsp);/gi, (_: string, n: string) =>
       ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' })[n.toLowerCase() as 'amp']);
 }
@@ -65,76 +61,102 @@ function allowedLink(url: string, host: string) {
 }
 async function getText(url: string) {
   const feed = await fetch(url, {
-    headers: { 'User-Agent': 'TradingOfficeFundamentalAnalyst/1.0', Accept: 'application/rss+xml, application/json, application/xml, text/xml' },
+    headers: { 'User-Agent': 'TradingOfficeFundamentalAnalyst/1.2', Accept: 'application/rss+xml, application/json, application/xml, text/xml' },
     signal: AbortSignal.timeout(15_000),
   });
   if (!feed.ok) throw new Error(`HTTP ${feed.status}`);
   const body = await feed.text();
   if (body.length > 2_000_000) throw new Error('Feed too large');
-  return body;
+  return { body, fetched_at: nowIso(), response_at: parseSourceTime(feed.headers.get('date'), Date.now()).at };
 }
-async function rssItems(xml: string, source: typeof SOURCES[number]) {
+async function rssItems(xml: string, source: Source, fetchedAt: string) {
   if (!/<rss\b/i.test(xml)) throw new Error('Not an RSS feed');
-  const out = [];
+  const out: Item[] = [];
+  let parsed_count = 0;
+  const now = Date.parse(fetchedAt);
   for (const [, raw] of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
+    parsed_count++;
     const title = field(raw, 'title').slice(0, 240);
     const url = field(raw, 'link');
-    const dateText = field(raw, 'pubDate');
-    // Investing.com omits an explicit zone. Its feed clock is treated as UTC.
-    const date = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(dateText)
-      ? new Date(`${dateText.replace(' ', 'T')}Z`) : new Date(dateText);
-    if (!title || !allowedLink(url, source.host) || !Number.isFinite(date.getTime())) continue;
-    if (date.getTime() < Date.now() - 48 * 3_600_000 || date.getTime() > Date.now() + 3_600_000) continue;
+    const time = parseSourceTime(field(raw, 'pubDate'), now);
+    if (!title || !allowedLink(url, source.host)) continue;
+    if (time.at && (Date.parse(time.at) < now - 48 * 3_600_000 || Date.parse(time.at) > now + 3_600_000)) continue;
+    if (out.length >= 30) continue;
+    const canonical = canonicalUrl(url);
+    const published = time.quality === 'explicit_timezone' ? time.at : null;
     out.push({
-      item_key: await sha256(`${source.name}|${url}`), source: source.name, kind: 'headline',
-      title, url, event_at: date.toISOString(), relevance: relevance(title),
+      item_key: await sha256(`${source.name}|${canonical}`), source: source.name, feed_id: source.id, kind: 'headline',
+      title, url: canonical, event_at: published, published_at: published, observed_at: null,
+      fetched_at: fetchedAt, timestamp_raw: time.raw, timestamp_quality: time.quality,
+      freshness: headlineFreshness(published, time.quality, now), ...relevanceOf(title), story_key: await storyKey(title),
     });
   }
-  return out;
+  return { items: out, parsed_count, coverage_start: null, coverage_end: null };
 }
-async function calendarItems(body: string) {
+async function calendarItems(body: string, source: Source, fetchedAt: string) {
   const rows = JSON.parse(body);
   if (!Array.isArray(rows)) throw new Error('Calendar is not an array');
-  const out = [];
+  const out: Item[] = [];
+  const coverage: string[] = [];
+  const now = Date.parse(fetchedAt);
   for (const row of rows) {
-    const when = new Date(row.date);
-    if (!Number.isFinite(when.getTime()) || !row.title) continue;
-    if (when.getTime() < Date.now() - 60 * 60_000 || when.getTime() > Date.now() + 7 * 86_400_000) continue;
+    if (!row || typeof row !== 'object') continue;
+    const time = parseSourceTime(row.date, now);
+    if (!time.at) continue;
+    // Future timestamps are expected for scheduled releases, not publications.
+    coverage.push(time.at);
+    if (!row.title || Date.parse(time.at) < now - 60 * 60_000 || Date.parse(time.at) > now + 7 * 86_400_000) continue;
     if (row.country !== 'USD' || !['High', 'Medium'].includes(row.impact)) continue;
+    if (out.length >= 40) continue;
     out.push({
       item_key: await sha256(`Forex Factory|${row.country}|${row.title}|${row.date}`),
-      source: 'Forex Factory', kind: 'calendar', title: String(row.title).slice(0, 240),
-      url: 'https://www.forexfactory.com/calendar', event_at: when.toISOString(),
+      source: source.name, feed_id: source.id, kind: 'calendar', title: String(row.title).slice(0, 240),
+      url: 'https://www.forexfactory.com/calendar', event_at: time.at, published_at: null, observed_at: null,
+      fetched_at: fetchedAt, timestamp_raw: time.raw, timestamp_quality: 'explicit_timezone',
+      freshness: Date.parse(time.at) >= now ? 'scheduled' : 'elapsed', topics: ['USD release'],
+      relevance_reason: `${row.impact}-impact USD release listed by the calendar provider. Its result is not checked.`,
+      story_key: await storyKey(`${row.country}|${row.title}|${time.at}`),
       importance: row.impact, currency: row.country, relevance: row.impact === 'High' ? 2 : 1,
     });
   }
-  return out;
+  coverage.sort();
+  return { items: out, parsed_count: rows.length, coverage_start: coverage[0] || null, coverage_end: coverage.at(-1) || null };
 }
 async function scan(url: string, publicKey: string, token: string) {
   const feeds = await Promise.all(SOURCES.map(async (source) => {
+    const attempted_at = nowIso();
     try {
-      const body = await getText(source.url);
-      const items = source.name === 'Forex Factory' ? await calendarItems(body) : await rssItems(body, source);
-      return { source, items, ok: true, error: '' };
+      const fetched = await getText(source.url);
+      const parsed = source.kind === 'calendar' ? await calendarItems(fetched.body, source, fetched.fetched_at)
+        : await rssItems(fetched.body, source, fetched.fetched_at);
+      return { source, attempted_at, ...fetched, ...parsed, ok: true, error: '' };
     } catch (error) {
-      return { source, items: [], ok: false, error: String(error instanceof Error ? error.message : error).slice(0, 120) };
+      return { source, attempted_at, fetched_at: null, response_at: null, items: [], parsed_count: 0,
+        coverage_start: null, coverage_end: null, ok: false,
+        error: String(error instanceof Error ? error.message : error).slice(0, 120) };
     }
   }));
-  const health = feeds.map(({ source, items, ok, error }) => ({
-    source: source.name, feed: source.url.split('/').at(-1), ok, count: items.length,
-    ...(error ? { error } : {}),
-  }));
-  const all = [...new Map(feeds.flatMap((feed) => feed.items).map((item) => [item.item_key, item])).values()];
-  const upcoming = all.filter((item) => item.kind === 'calendar' && Date.parse(item.event_at) >= Date.now())
-    .sort((a, b) => Date.parse(a.event_at) - Date.parse(b.event_at)).slice(0, 8);
-  const headlines = all.filter((item) => item.kind === 'headline' && item.relevance > 0)
-    .sort((a, b) => Date.parse(b.event_at) - Date.parse(a.event_at)).slice(0, 8);
+  const health: FeedHealth[] = feeds.map(({ source, items, ok, error, attempted_at, fetched_at, response_at, parsed_count, coverage_start, coverage_end }) => {
+    const fresh_count = items.filter((item) => item.freshness === 'fresh').length;
+    const unknown_time_count = items.filter((item) => item.kind === 'headline' && !item.published_at).length;
+    const newest = items.map((item) => item.published_at).filter((at): at is string => Boolean(at)).sort().at(-1) || null;
+    const calendarStale = coverage_end && Date.parse(coverage_end) < Date.parse(attempted_at.slice(0, 10) + 'T00:00:00Z');
+    const freshness = !ok ? 'unavailable' : source.kind === 'calendar' ? !coverage_end ? 'unknown' : calendarStale ? 'stale' : 'current_week'
+      : fresh_count ? unknown_time_count ? 'partial' : 'fresh' : unknown_time_count ? 'unknown' : newest ? 'aging_or_stale' : 'empty';
+    return { source: source.name, feed_id: source.id, feed: source.url.split('/').at(-1)!, url: source.url, kind: source.kind,
+      ok, attempted_at, fetched_at, response_at, count: items.length, parsed_count, excluded_count: parsed_count - items.length,
+      fresh_count, unknown_time_count, newest_published_at: newest, coverage_start, coverage_end, freshness,
+      ...(error ? { error } : {}) };
+  });
+  const unique = [...new Map(feeds.flatMap((feed) => feed.items).map((item) => [item.item_key, item])).values()];
+  // Calendar and directly relevant items precede unrelated headlines in the bounded report.
+  const all = unique.sort((a, b) => Number(b.kind === 'calendar') - Number(a.kind === 'calendar') || b.relevance - a.relevance).slice(0, 80);
+  const { report: evidence, upcoming, headlines } = buildReport(all, health, nowIso());
   const status = {
-    version: '1.1-server', focus: 'XAUUSD', checked_at: nowIso(), feeds: health,
+    version: VERSION, focus: 'XAUUSD', checked_at: evidence.generated_at, feeds: health, report: evidence,
     healthy_feeds: feeds.filter((feed) => feed.ok).length, total_feeds: SOURCES.length,
-    upcoming, headlines,
-    summary: `${upcoming.length} upcoming USD events · ${headlines.length} relevant headlines`,
-    limitation: 'Headline and calendar watch only. No trade direction or orders.',
+    provider_count: new Set(SOURCES.map((source) => source.name)).size, upcoming, headlines,
+    summary: evidence.summary, limitation: evidence.method,
   };
   const report = await fetch(`${url}/rest/v1/rpc/analyst_sync`, {
     method: 'POST',
@@ -143,7 +165,7 @@ async function scan(url: string, publicKey: string, token: string) {
     signal: AbortSignal.timeout(20_000),
   });
   if (!report.ok) throw new Error(`Office report HTTP ${report.status}: ${(await report.text()).slice(0, 180)}`);
-  return { checked_at: status.checked_at, healthy_feeds: status.healthy_feeds,
+  return { checked_at: status.checked_at, report_id: evidence.report_id, evidence_quality: evidence.evidence_quality, healthy_feeds: status.healthy_feeds,
     total_feeds: SOURCES.length, upcoming: upcoming.length, headlines: headlines.length,
     saved: (await report.json()).items_received };
 }

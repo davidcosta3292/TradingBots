@@ -8,6 +8,7 @@ import { COLORS, EYES, GEAR, lookOf } from './looks.js?v=8';
 import { ASSIGNMENTS, assignmentOf, isTrader, isAnalyst } from './assignments.js?v=12';
 import { play, setSound, soundOn } from './sounds.js?v=5';
 import { diagnosticsCard } from './diagnostics.js?v=1';
+import { evidenceCard, sourceHealth, newsRow, reportHistory } from './analyst.js?v=1';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const VIEW_KEY = 'trading-office-view';
@@ -47,6 +48,7 @@ const store = {
   events: new Map(),      // robot id -> newest events first
   deals: new Map(),       // robot id -> deals, oldest first
   checks: new Map(),      // robot id -> structured M15 diagnostics, newest first
+  reports: new Map(),     // robot id -> latest 12 evidence snapshots, loaded on demand
 };
 let sb = null;
 let view = 'cards';
@@ -59,6 +61,8 @@ let lightingMode = 'day';
 try { lightingMode = localStorage.getItem(LIGHTING_KEY) === 'evening' ? 'evening' : 'day'; } catch { /* private window */ }
 const htmlCache = new WeakMap();
 const openLooks = new Set(); // robots whose look picker is open
+const openReports = new Set();
+const reportLoads = new Map();
 
 const $ = (id) => document.getElementById(id);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
@@ -509,6 +513,16 @@ async function onClick(event) {
   const deleteButton = target.closest('button[data-delete-robot]');
   if (deleteButton && !deleteButton.disabled) return deleteRobot(deleteButton.dataset.deleteRobot);
 
+  const historyToggle = target.closest('[data-report-history]');
+  if (historyToggle) {
+    const id = historyToggle.dataset.reportHistory;
+    if (openReports.has(id)) { openReports.delete(id); return render(); }
+    openReports.add(id);
+    return loadReports(id);
+  }
+  const refreshReports = target.closest('[data-refresh-reports]');
+  if (refreshReports) return loadReports(refreshReports.dataset.refreshReports);
+
   const button = target.closest('button[data-cmd]');
   if (!button || button.disabled) return;
   const robot = store.robots.get(button.dataset.robot);
@@ -603,6 +617,9 @@ function forgetRobot(id) {
   store.events.delete(id);
   store.deals.delete(id);
   store.checks.delete(id);
+  store.reports.delete(id);
+  reportLoads.delete(id);
+  openReports.delete(id);
   openLooks.delete(id);
   if (selectedId === id) selectedId = null;
   if (newRobotToken?.id === id) newRobotToken = null;
@@ -826,26 +843,24 @@ function card(r) {
   </article>`;
 }
 
-function safeNewsLink(item) {
+async function loadReports(id) {
+  const robot = store.robots.get(id);
+  if (!robot || !isAnalyst(robot) || reportLoads.get(id)?.loading) return;
+  if (DEMO) return render();
+  reportLoads.set(id, { loading: true });
+  render();
   try {
-    const url = new URL(item.url);
-    const host = url.hostname.toLowerCase();
-    const domains = ['forexfactory.com', 'investing.com', 'bloomberg.com', 'wsj.com'];
-    return url.protocol === 'https:' && domains.some((d) => host === d || host.endsWith(`.${d}`))
-      ? url.href : null;
-  } catch { return null; }
-}
-
-function newsRow(item, calendar = false) {
-  const url = safeNewsLink(item);
-  const title = esc(item.title);
-  return `<li><span class="news-meta">${esc(item.source)} · ${calendar ? 'Event' : 'Feed'} ${dayTime(item.event_at)}${item.importance ? ` · ${esc(item.importance)} impact` : ''}</span>
-    ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${title}</a>` : `<span>${title}</span>`}</li>`;
+    const { data, error } = await sb.from('analyst_reports').select('report_id,generated_at,payload')
+      .eq('robot_id', id).order('generated_at', { ascending: false }).limit(12);
+    if (error) throw error;
+    if (store.robots.has(id)) store.reports.set(id, data);
+    reportLoads.set(id, {});
+  } catch (error) { reportLoads.set(id, { error: error.message || 'Request failed' }); }
+  render();
 }
 
 function analystCard(r, mood, owner, mine) {
   const s = r.status || {};
-  const feeds = Array.isArray(s.feeds) ? s.feeds : [];
   const upcoming = Array.isArray(s.upcoming) ? s.upcoming : [];
   const headlines = Array.isArray(s.headlines) ? s.headlines : [];
   const events = store.events.get(r.id) || [];
@@ -855,16 +870,17 @@ function analystCard(r, mood, owner, mine) {
       <span class="pill ${mood.key}">${esc(mood.label)}</span></header>
     <p class="seen">${seenText(r, mood.key !== 'offline' && mood.key !== 'planned')}</p>
     <p class="flat">${r.last_report_at ? 'Supabase checks economic headlines and upcoming USD releases every five minutes.' : 'Waiting for a server schedule.'} Reports observations to the office and Telegram. It cannot trade or control Trader robots.</p>
-    ${r.last_report_at ? `<div class="news-health"><b>Sources ${esc(s.healthy_feeds ?? 0)}/${esc(s.total_feeds ?? 5)} online</b>
-      <small>Last scan ${s.checked_at ? esc(ago(s.checked_at)) : 'unknown'}</small>
-      <div>${feeds.map((f) => `<span class="source-chip ${f.ok ? 'ok' : 'bad'}" title="${esc(f.error || f.feed || '')}">${esc(f.source)} ${f.ok ? '✓' : '!'}</span>`).join('')}</div></div>` : ''}
+    ${r.last_report_at ? evidenceCard(s) + sourceHealth(s) : ''}
     <section class="news-section"><h3>Upcoming USD events</h3>
       ${upcoming.length ? `<ol>${upcoming.slice(0, 6).map((item) => newsRow(item, true)).join('')}</ol>`
         : `<p>${r.last_report_at ? 'No upcoming events in this week’s feed. The Trader EA still uses its own MT5 calendar guard.' : 'Waiting for the first scan.'}</p>`}</section>
     <section class="news-section"><h3>Gold-relevant headlines</h3>
       ${headlines.length ? `<ol>${headlines.slice(0, 8).map((item) => newsRow(item)).join('')}</ol>`
         : `<p>${r.last_report_at ? 'No matching headlines in the recent feeds.' : 'Waiting for the first scan.'}</p>`}</section>
-    <p class="viewonly">Relevance is a keyword filter, not a prediction. Read the linked source before making decisions.</p>
+    <p class="viewonly">Converted times use New York time; publisher dates without a zone stay unconverted. Topics are title keyword matches. Provider observation times are unknown; fetching a page does not measure its publication age.</p>
+    ${r.last_report_at ? `<div class="report-history-control"><button type="button" data-report-history="${r.id}" aria-expanded="${openReports.has(r.id)}">Report history</button>
+      ${openReports.has(r.id) ? `<button type="button" data-refresh-reports="${r.id}"${reportLoads.get(r.id)?.loading ? ' disabled' : ''}>Refresh history</button>` : ''}</div>
+      ${openReports.has(r.id) ? reportHistory(store.reports.get(r.id) || [], reportLoads.get(r.id)?.loading, reportLoads.get(r.id)?.error) : ''}` : ''}
     ${mine ? assignmentPicker(r) + lookPicker(r) + deleteControl(r) : ''}
     ${events.length ? `<ol class="feed">${events.slice(0, 5).map((e) =>
       `<li><time>${clock(e.at)}</time>${esc(e.message)}</li>`).join('')}</ol>` : ''}
@@ -1072,14 +1088,46 @@ function loadDemo() {
     id: 'r3', name: 'Fundamental Analyst', assignment: 'analyst', owner_id: 'me',
     state: 'active', last_report_at: iso(5000), look: {},
     status: {
-      healthy_feeds: 5, total_feeds: 5, checked_at: iso(5000),
-      feeds: ['Forex Factory', 'Investing.com', 'Bloomberg', 'WSJ'].map((source) => ({ source, ok: true })),
+      version: '1.2-server', healthy_feeds: 5, total_feeds: 5, provider_count: 4, checked_at: iso(5000),
+      feeds: [
+        { source: 'Forex Factory', kind: 'calendar', feed: 'Weekly calendar', freshness: 'current_week', count: 1,
+          coverage_start: iso(4 * 86_400_000), coverage_end: new Date(now + 90 * 60_000).toISOString() },
+        { source: 'Investing.com', kind: 'headline', feed: 'Commodities', freshness: 'unknown', count: 1, unknown_time_count: 1 },
+        { source: 'Investing.com', kind: 'headline', feed: 'Economy', freshness: 'unknown', count: 1, unknown_time_count: 1 },
+        { source: 'Bloomberg', kind: 'headline', feed: 'Economics', freshness: 'fresh', count: 1, newest_published_at: iso(20 * 60_000) },
+        { source: 'WSJ', kind: 'headline', feed: 'Economy', freshness: 'aging_or_stale', count: 1, newest_published_at: iso(9 * 3_600_000) },
+      ].map((f) => ({ ...f, ok: true, fetched_at: iso(5000), attempted_at: iso(10000) })),
       upcoming: [{ source: 'Forex Factory', kind: 'calendar', title: 'Sample · USD inflation release',
-        event_at: new Date(now + 90 * 60_000).toISOString(), importance: 'High', url: 'https://www.forexfactory.com/calendar' }],
+        item_key: 'sample-calendar', event_at: new Date(now + 90 * 60_000).toISOString(), importance: 'High',
+        freshness: 'scheduled', fetched_at: iso(5000), relevance_reason: 'A scheduled USD release; its result and price reaction are not checked.', url: 'https://www.forexfactory.com/calendar' }],
       headlines: [{ source: 'Bloomberg', kind: 'headline', title: 'Sample · Fed policy discussion and gold market',
-        event_at: iso(20 * 60_000), url: 'https://www.bloomberg.com/' }],
+        item_key: 'sample-headline', published_at: iso(20 * 60_000), timestamp_quality: 'explicit_timezone',
+        freshness: 'fresh', fetched_at: iso(5000), relevance_reason: 'Monetary policy can affect gold through yields and the dollar.', url: 'https://www.bloomberg.com/' },
+        { source: 'Investing.com', kind: 'headline', title: 'Sample · Gold investors watch upcoming data',
+          item_key: 'sample-unknown', published_at: null, timestamp_quality: 'timezone_unknown', timestamp_raw: '2026-10-09 16:00:00',
+          freshness: 'unknown', fetched_at: iso(5000), url: 'https://www.investing.com/' }],
+      report: {
+        schema_version: 1, report_id: 'demo-current', generated_at: iso(5000), expires_at: new Date(now + 12 * 60_000).toISOString(),
+        direction: 'unknown', evidence_quality: 'partial', title: 'Watch the next USD release',
+        summary: 'Sample report · 1 upcoming USD event · 1 fresh headline · 1 unverified time',
+        interpretation: 'These sources identify topics and scheduled event risk. They do not establish a bullish or bearish gold trade.',
+        observations: [{ claim: 'Next listed release: sample USD inflation data.', basis: 'Scheduled event; the outcome is unknown.', evidence_keys: ['sample-calendar'] },
+          { claim: 'One title mentions Fed policy and gold.', basis: 'A keyword match in a title, without full-article or price analysis.', evidence_keys: ['sample-headline'] }],
+        warnings: ['One sample headline has no publication time zone; it cannot trigger an urgent headline alert.'],
+        reassess_when: ['The next five-minute scan changes headlines, the calendar or source availability.',
+          'The release occurs; check the actual result and price reaction separately.', 'This report expires after 12 minutes.'],
+        method: 'Deterministic calendar and title rules; no LLM or trade authorization.',
+      },
     },
   });
+  const demoStatus = store.robots.get('r3').status;
+  const oldStatus = structuredClone(demoStatus);
+  oldStatus.report.report_id = 'demo-earlier';
+  oldStatus.report.generated_at = iso(30 * 60_000);
+  oldStatus.report.expires_at = iso(18 * 60_000);
+  store.reports.set('r3', [demoStatus, oldStatus].map((payload) => ({
+    report_id: payload.report.report_id, generated_at: payload.report.generated_at, payload,
+  })));
   store.lastCommand.set('r2', { id: 7, robot_id: 'r2', type: 'start', created_by: 'friend', created_at: iso(3000000), status: 'done', result: 'working' });
   store.events.set('r1', [
     { id: 3, robot_id: 'r1', kind: 'trade', at: iso(420000), message: 'Opened BUY 0.05 lots XAUUSD, stop 3740.10, target 3773.40' },
