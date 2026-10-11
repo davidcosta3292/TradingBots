@@ -8,6 +8,7 @@ import { COLORS, EYES, GEAR, lookOf } from './looks.js?v=8';
 import { ASSIGNMENTS, assignmentOf, isTrader, isAnalyst } from './assignments.js?v=12';
 import { play, setSound, soundOn } from './sounds.js?v=5';
 import { diagnosticsCard } from './diagnostics.js?v=1';
+import { decisionTimeline } from './timeline.js?v=1';
 import { evidenceCard, sourceHealth, newsRow, reportHistory } from './analyst.js?v=1';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -48,6 +49,7 @@ const store = {
   events: new Map(),      // robot id -> newest events first
   deals: new Map(),       // robot id -> deals, oldest first
   checks: new Map(),      // robot id -> structured M15 diagnostics, newest first
+  executions: new Map(), // robot id -> bounded captured execution events
   reports: new Map(),     // robot id -> latest 12 evidence snapshots, loaded on demand
 };
 let sb = null;
@@ -63,6 +65,7 @@ const htmlCache = new WeakMap();
 const openLooks = new Set(); // robots whose look picker is open
 const openReports = new Set();
 const reportLoads = new Map();
+const timelineLoads = new Map();
 
 const $ = (id) => document.getElementById(id);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
@@ -234,6 +237,7 @@ function select(id) {
   else if (was) office?.home();
   render();
   if (id !== was) $('panel').scrollTop = 0;
+  if(id && isTrader(store.robots.get(id)) && !timelineLoads.has(id)) loadExecutionHistory(id);
 }
 
 function sizeOfficeView() {
@@ -301,8 +305,45 @@ function addCheck(row) {
   store.checks.set(row.robot_id,rows);
 }
 
+function addExecution(row) {
+  if(!row?.robot_id || !row.event_id) return;
+  if(row.kind==='decision') {
+    const check=row.payload?.check;
+    if(check?.at) addCheck({robot_id:row.robot_id,bar_at:new Date(check.at*1000).toISOString(),version:check.version,payload:check});
+  }
+  const list=store.executions.get(row.robot_id)||[];
+  store.executions.set(row.robot_id,[row,...list.filter(e=>e.event_id!==row.event_id)]
+    .sort((a,b)=>Date.parse(b.occurred_at)-Date.parse(a.occurred_at)).slice(0,300));
+}
+
+async function loadExecutionHistory(id) {
+  const robot=store.robots.get(id);
+  if(!robot || !isTrader(robot) || timelineLoads.get(id)?.loading) return;
+  if(DEMO) { timelineLoads.set(id,{loaded:true}); return render(); }
+  timelineLoads.set(id,{loading:true}); render();
+  try {
+    const result=await sb.from('decision_events').select('*').eq('robot_id',id).neq('kind','decision')
+      .order('occurred_at',{ascending:false}).limit(150);
+    if(result.error) throw result.error;
+    if(!store.robots.has(id)) return;
+    result.data.forEach(addExecution);
+    const ids=[...new Set(result.data.map(e=>e.check_id).filter(Boolean))].slice(0,20);
+    if(ids.length) {
+      const decision=await sb.from('decision_events').select('*').eq('robot_id',id).eq('kind','decision').in('check_id',ids).limit(20);
+      if(decision.error) throw decision.error;
+      if(!store.robots.has(id)) return;
+      decision.data.forEach(addExecution);
+    }
+    timelineLoads.set(id,{loaded:true});
+  } catch(error) { if(store.robots.has(id)) timelineLoads.set(id,{error:error.message||'Request failed'}); }
+  render();
+}
+
 function subscribe() {
   sb.channel('office')
+    .on('postgres_changes', {event:'INSERT',schema:'public',table:'decision_events'}, ({new:row})=>{
+      if(store.robots.has(row?.robot_id)) { addExecution(row); render(); }
+    })
     .on('postgres_changes', {event:'INSERT',schema:'public',table:'strategy_checks'}, ({new:row})=>{
       if(row?.robot_id) { addCheck(row); render(); }
     })
@@ -416,6 +457,8 @@ function bubbleFor(event) {
 
 async function onClick(event) {
   const target = event.target;
+  const timelineButton=target.closest('[data-load-timeline]');
+  if(timelineButton) return loadExecutionHistory(timelineButton.dataset.loadTimeline);
   if (target.closest('[data-add-robot]')) {
     setupOpen = !setupOpen;
     $('setup').dataset.mode = '';
@@ -617,6 +660,8 @@ function forgetRobot(id) {
   store.events.delete(id);
   store.deals.delete(id);
   store.checks.delete(id);
+  store.executions.delete(id);
+  timelineLoads.delete(id);
   store.reports.delete(id);
   reportLoads.delete(id);
   openReports.delete(id);
@@ -834,6 +879,7 @@ function card(r) {
     ${online && s.upcoming_news ? `<p class="upcoming-news"><b>News watch · next hour</b> ${esc(s.upcoming_news)}</p>` : ''}
     ${s.link_error ? `<p class="warn">${esc(s.link_error)}</p>` : ''}
 
+    ${decisionTimeline(r,store.checks.get(r.id)||[],store.executions.get(r.id)||[],timelineLoads.get(r.id)||{},DEMO)}
     ${tradeHistory(r, currency)}
     ${mine ? assignmentPicker(r) : ''}
     ${mine ? lookPicker(r) + deleteControl(r) : ''}
@@ -1084,6 +1130,29 @@ function loadDemo() {
   store.robots.get('r2').status.strategy_check=sampleCheck;
   store.robots.get('r2').status.signal_ready=true;
   addCheck({robot_id:'r2',bar_at:new Date(sampleCheck.at*1000).toISOString(),version:'1.3.0',payload:sampleCheck});
+  const bar=Math.floor(now/900000)*900;
+  const samplePlan={available:true,feasible:true,entry:3751.2,stop:3746.2,target:3766.2,
+    stop_distance:5,minimum_lot_risk:5,risk_budget:25,calculated_volume:0.05,minimum_volume:0.01,reason:'Sample size fits budget'};
+  const traceCheck=(at,decision,eligible)=>({at,checked_at:at,version:'1.3.1',check_id:`1.3.1/${at}`,strategy_revision:'1.3.0',
+    signal_ready:eligible,operational_permission:true,position_free:true,order_eligible:eligible,decision,blocks:[],
+    strategy:{data_ready:true,mode:'full',reason:eligible?'Sample · complete BOS/retest setup':'Sample · reaction not confirmed',gates:{trend:true,reaction:eligible,confirmation:eligible}},sizing:eligible?samplePlan:{available:false}});
+  const filledCheck=traceCheck(bar-900,'Sample · entry eligible; preparing MT5 order call',true);
+  const waitingCheck=traceCheck(bar,'Sample · position already open',false);
+  waitingCheck.position_free=false;
+  store.robots.get('r1').status.version='1.3.1';
+  store.robots.get('r1').status.strategy_check=waitingCheck;
+  store.robots.get('r1').status.positions=[{side:'buy',volume:0.05,open:3751.2,sl:3746.2,tp:3766.2,profit:25.2}];
+  for(const c of [filledCheck,waitingCheck]) addCheck({robot_id:'r1',bar_at:new Date(c.at*1000).toISOString(),version:c.version,payload:c});
+  const rejectedCheck=traceCheck(bar-1800,'Sample · entry eligible; preparing MT5 order call',true);
+  addCheck({robot_id:'r1',bar_at:new Date(rejectedCheck.at*1000).toISOString(),version:rejectedCheck.version,payload:rejectedCheck});
+  const sampleExecution=(c,kind,stage,offset,payload)=>addExecution({robot_id:'r1',event_id:`sample:${c.at}:${kind}`,check_id:c.check_id,
+    attempt_id:c.check_id+'/123456789',bar_at:new Date(c.at*1000).toISOString(),version:c.version,kind,stage,
+    occurred_at:new Date((c.at+offset)*1000).toISOString(),entry_point:kind==='fill'?'OnTradeTransaction':'CTrade',payload});
+  sampleExecution(filledCheck,'submission','submitted',1,{side:'buy',sizing:samplePlan});
+  sampleExecution(filledCheck,'response','accepted',2,{call_ok:true,retcode:10009,retcode_external:0,request_id:42,order_ticket:'91001',deal_ticket:'92001',message:'Sample · Request completed',duration_us:185000,terminal_error:0});
+  sampleExecution(filledCheck,'fill','filled',2,{side:'buy',volume:0.05,price:3751.2,deal_ticket:'92001',order_ticket:'91001',position_id:'93001'});
+  sampleExecution(rejectedCheck,'submission','submitted',1,{side:'buy',sizing:samplePlan});
+  sampleExecution(rejectedCheck,'response','rejected',2,{call_ok:false,retcode:10016,retcode_external:0,request_id:41,order_ticket:'0',message:'Sample · Invalid stops',duration_us:95000,terminal_error:0});
   store.robots.set('r3', {
     id: 'r3', name: 'Fundamental Analyst', assignment: 'analyst', owner_id: 'me',
     state: 'active', last_report_at: iso(5000), look: {},

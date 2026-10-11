@@ -68,7 +68,7 @@ These are prioritized proposals, not changes deployed by this research task.
 
 | Priority | Improvement | What already exists | Concrete next work and acceptance evidence |
 |---|---|---|---|
-| 1 | Explain the full decision chain | Version 1.3.0 records M15 gates and sizing | Use a stable `(robot, bar, version)` check ID through candidate, command, broker submission and fill. Show which stage waited; reconcile native EA behavior with candle replay when verification is requested. |
+| 1 | Explain the full decision chain | [Version 1.3.1](../plan/decision-timeline.md) links M15 checks and attempt IDs to MT5 calls, return codes and broker deals, with durable telemetry replay | Observe the first natural broker-to-office chain after activation; reconcile native EA behavior with candle replay when verification is requested. |
 | 2 | Fundamental Analyst evidence cards | Scheduled RSS/calendar scan, timeouts, source health, title keyword relevance | Add published/event/observed/fetched timestamps, explicit unknown/stale states, provider provenance and source-specific failures. Show citations and reassessment conditions for interpreted reports. |
 | 3 | Telegram delivery visibility | Database alerts and trade/command notifications | Add an outbox with idempotency key, attempts, bounded retries and confirmed response metadata. Display delivery failures separately from robot offline status. |
 | 4 | Strategy definition as a versioned contract | Strategy card, code definitions and replay artifacts | Store rule version and configuration hash; keep human-marked positive, negative and ambiguous examples. Compare structure and EMA readings before changing gates. |

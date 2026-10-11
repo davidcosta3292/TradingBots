@@ -66,6 +66,8 @@ This is the skeleton everything else hangs on, built before the strategy exists.
 
 ### M2 · The real robot (me, with you checking the rules)
 
+**Update (11 Oct):** OfficeRobot 1.3.1 adds a [trade decision timeline](decision-timeline.md), linking M15 checks, refreshed order sizing, MT5 return codes and actual broker deals. The strategy remains revision 1.3.0. New records queue locally across outages and backfill Supabase. The source download and canonical MT5 installation are updated. Reattach with the same token and press Start; observation of a natural demo entry/fill is still required. No forced trades or new profitability claims.
+
 - Code the strategy card into the same skeleton. The buttons and reporting are already there.
 - Backtest it. The platform's backtester can't make web calls, so reporting switches itself off there.
 - Check that the backtest finds the example trades listed on the card.

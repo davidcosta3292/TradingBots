@@ -8,7 +8,7 @@
 //|  - Starts paused, except for a same-chart timeframe change.      |
 //+------------------------------------------------------------------+
 #property copyright   "Trading Office"
-#property version     "1.30"
+#property version     "1.31"
 #property description "Trading Office robot: XAUUSD demo v3, per-bar diagnostics, FTMO guards."
 
 #include "Clock.mqh"
@@ -18,7 +18,8 @@
 #include "Trader.mqh"
 #include "Link.mqh"
 
-#define ROBOT_VERSION "1.3.0"
+#define ROBOT_VERSION "1.3.1"
+#define STRATEGY_REVISION "1.3.0"
 // Our office. Used whenever the URL or key input is left empty.
 #define OFFICE_URL    "https://tpmrowyqsayyypkxkvfz.supabase.co"
 #define OFFICE_KEY    "sb_publishable_wsTQsr8pwa9lJP8I2QEv9g_gbmj_gvM"
@@ -69,6 +70,7 @@ CFtmoGuards      g_guards;
 CPlanStrategy    g_strategy;
 COfficeTrader    g_trader;
 COfficeLink      g_link;
+CDecisionJournal g_timeline;
 
 ENUM_ROBOT_STATE g_state=STATE_PAUSED;     // a fresh attach always starts paused
 bool             g_maxStopTripped=false;
@@ -337,6 +339,84 @@ string DealJson(const ulong ticket)
           +"}";
   }
 
+// Correlation uses broker metadata or an exact mapped ticket, never time proximity.
+bool OrderDecisionRef(const ulong order,SDecisionRef &ref)
+  {
+   if(order==0) return false;
+   if(HistoryOrderSelect(order) && TraceComment(HistoryOrderGetString(order,ORDER_COMMENT),ref)) return true;
+   return g_timeline.Find(order,0,ref);
+  }
+
+bool DealDecisionRef(const ulong ticket,const long entry,const ulong position,SDecisionRef &ref)
+  {
+   if(TraceComment(HistoryDealGetString(ticket,DEAL_COMMENT),ref)) return true;
+   if(OrderDecisionRef((ulong)HistoryDealGetInteger(ticket,DEAL_ORDER),ref)) return true;
+   if(entry==DEAL_ENTRY_IN || !HistorySelectByPosition(position)) return false;
+   // A close can reference its original entry only when all entries are ours
+   // and their correlation agrees. Mixed/manual additions remain unlinked.
+   bool found=false;
+   SDecisionRef candidate; ZeroMemory(candidate);
+   int count=HistoryDealsTotal();
+   for(int i=0;i<count;i++)
+     {
+      ulong deal=HistoryDealGetTicket(i);
+      if(HistoryDealGetInteger(deal,DEAL_ENTRY)!=DEAL_ENTRY_IN) continue;
+      if(HistoryDealGetInteger(deal,DEAL_MAGIC)!=InpMagic || HistoryDealGetString(deal,DEAL_SYMBOL)!=_Symbol) return false;
+      SDecisionRef next; ZeroMemory(next);
+      if(!TraceComment(HistoryDealGetString(deal,DEAL_COMMENT),next)
+         && !OrderDecisionRef((ulong)HistoryDealGetInteger(deal,DEAL_ORDER),next)) return false;
+      if(found && next.attempt_id!=candidate.attempt_id) return false;
+      candidate=next; found=true;
+     }
+   if(found) ref=candidate;
+   return found;
+  }
+
+void RecordBrokerDeal(const ulong ticket,const bool recovered)
+  {
+   if(!g_link.Enabled()) return;
+   long entry=HistoryDealGetInteger(ticket,DEAL_ENTRY);
+   if(entry!=DEAL_ENTRY_IN && entry!=DEAL_ENTRY_OUT && entry!=DEAL_ENTRY_OUT_BY && entry!=DEAL_ENTRY_INOUT) return;
+   // Capture values before selecting history for correlation recovery.
+   ulong position=(ulong)HistoryDealGetInteger(ticket,DEAL_POSITION_ID);
+   ulong order=(ulong)HistoryDealGetInteger(ticket,DEAL_ORDER);
+   datetime at=ClockServerToUtc((datetime)HistoryDealGetInteger(ticket,DEAL_TIME));
+   string side=HistoryDealGetInteger(ticket,DEAL_TYPE)==DEAL_TYPE_BUY ? "buy" : "sell";
+   string payload="{"+JKey("deal_ticket")+JStr(TicketString(ticket))+","+JKey("order_ticket")+JStr(TicketString(order))
+      +","+JKey("position_id")+JStr(TicketString(position))+","+JKey("side")+JStr(side)+","+JKey("entry_type")+JInt(entry)
+      +","+JKey("volume")+JNum(HistoryDealGetDouble(ticket,DEAL_VOLUME),8)
+      +","+JKey("price")+JNum(HistoryDealGetDouble(ticket,DEAL_PRICE),5)
+      +","+JKey("profit")+JNum(HistoryDealGetDouble(ticket,DEAL_PROFIT))
+      +","+JKey("commission")+JNum(HistoryDealGetDouble(ticket,DEAL_COMMISSION)+HistoryDealGetDouble(ticket,DEAL_FEE))
+      +","+JKey("swap")+JNum(HistoryDealGetDouble(ticket,DEAL_SWAP))
+      +","+JKey("reason")+JStr(DealReasonName(HistoryDealGetInteger(ticket,DEAL_REASON)))
+      +","+JKey("recovered")+JBool(recovered)+"}";
+   SDecisionRef ref; ZeroMemory(ref);
+   if(!DealDecisionRef(ticket,entry,position,ref)) ZeroMemory(ref);
+   // Do not manufacture a timeline for legacy history without correlation.
+   if(recovered && ref.check_id=="") return;
+   string kind=entry==DEAL_ENTRY_IN ? "fill" : "exit";
+   string stage=entry==DEAL_ENTRY_IN ? "filled" : (entry==DEAL_ENTRY_INOUT ? "reversed" : "closed");
+   g_timeline.Record("deal:"+TicketString(ticket),ref,kind,stage,recovered ? "HistoryRecovery" : "OnTradeTransaction",payload,at);
+  }
+
+void RecordBrokerOrder(const ulong order)
+  {
+   if(!g_link.Enabled() || order==0 || !HistoryOrderSelect(order)) return;
+   if(HistoryOrderGetInteger(order,ORDER_MAGIC)!=InpMagic || HistoryOrderGetString(order,ORDER_SYMBOL)!=_Symbol) return;
+   long state=HistoryOrderGetInteger(order,ORDER_STATE);
+   string stage="";
+   if(state==ORDER_STATE_CANCELED) stage="canceled";
+   else if(state==ORDER_STATE_EXPIRED) stage="expired";
+   else if(state==ORDER_STATE_REJECTED) stage="rejected";
+   else if(state==ORDER_STATE_FILLED) stage="order_filled";
+   if(stage=="") return;
+   SDecisionRef ref; ZeroMemory(ref); if(!OrderDecisionRef(order,ref)) ZeroMemory(ref);
+   datetime at=ClockServerToUtc((datetime)HistoryOrderGetInteger(order,ORDER_TIME_DONE));
+   g_timeline.Record("order:"+TicketString(order)+":"+JInt(state),ref,"order_state",stage,"OnTradeTransaction",
+      "{"+JKey("order_ticket")+JStr(TicketString(order))+","+JKey("order_state")+JInt(state)+"}",at);
+  }
+
 // The office keeps its own copy of the last week of this robot's trades.
 void QueueRecentDeals(void)
   {
@@ -352,6 +432,13 @@ void QueueRecentDeals(void)
          && HistoryDealGetString(ticket,DEAL_SYMBOL)==_Symbol)
          g_link.QueueDeal(DealJson(ticket));
      }
+   // Copy tickets before correlation recovery selects position history.
+   ulong tickets[]; ArrayResize(tickets,total);
+   for(int i=0;i<total;i++) tickets[i]=HistoryDealGetTicket(i);
+   for(int i=0;i<total;i++)
+      if(tickets[i]>0 && HistoryDealSelect(tickets[i]) && HistoryDealGetInteger(tickets[i],DEAL_MAGIC)==InpMagic
+         && HistoryDealGetString(tickets[i],DEAL_SYMBOL)==_Symbol)
+         RecordBrokerDeal(tickets[i],true);
   }
 
 string BuildReport(void)
@@ -367,6 +454,9 @@ string BuildReport(void)
      }
    string status="{"
                  +JKey("version")+JStr(ROBOT_VERSION)
+                 +","+JKey("strategy_revision")+JStr(STRATEGY_REVISION)
+                 +","+JKey("timeline_batch")+g_timeline.Batch()
+                 +","+JKey("telemetry")+g_timeline.Health()
                  +","+JKey("strategy")+JStr(g_strategy.Name())
                  +","+JKey("exercise_mode")+JBool(false)
                  +","+JKey("timeframe")+JStr("M15")
@@ -537,6 +627,7 @@ void SyncOnce(const bool withReport)
       return;
    if(withReport)
      {
+      g_timeline.AcknowledgeBatch();
       g_lastReport=g_lastPoll;
       g_reportNow=false;
      }
@@ -547,6 +638,7 @@ void SyncOnce(const bool withReport)
    string more;
    if(g_link.Sync(BuildReport(),more))
      {
+      g_timeline.AcknowledgeBatch();
       g_lastReport=TimeLocal();
       g_reportNow=false;
       if(more!="")
@@ -662,13 +754,18 @@ void RecordStrategyCheck(const ENUM_SIGNAL signal,const bool occupied,const stri
    string blocks="";
    for(int i=0;i<ArraySize(g_blocks);i++) { if(i>0) blocks+=","; blocks+=JStr(g_blocks[i]); }
    g_signalReady=signal!=SIGNAL_NONE;
-   g_checkJson="{"+JKey("at")+JInt((long)ClockServerToUtc(iTime(_Symbol,PERIOD_M15,0)))
+   datetime bar=ClockServerToUtc(iTime(_Symbol,PERIOD_M15,0));
+   SDecisionRef ref; ZeroMemory(ref); ref.version=ROBOT_VERSION; ref.bar_at=bar; ref.check_id=DecisionId(ROBOT_VERSION,bar);
+   g_checkJson="{"+JKey("at")+JInt((long)bar)+","+JKey("check_id")+JStr(ref.check_id)
       +","+JKey("checked_at")+JInt((long)ClockGmt())+","+JKey("version")+JStr(ROBOT_VERSION)
+      +","+JKey("strategy_revision")+JStr(STRATEGY_REVISION)
       +","+JKey("signal_ready")+JBool(g_signalReady)+","+JKey("operational_permission")+JBool(g_state==STATE_ACTIVE && ArraySize(g_blocks)==0)
       +","+JKey("position_free")+JBool(!occupied)+","+JKey("order_eligible")+JBool(eligible)
       +","+JKey("decision")+JStr(decision)+","+JKey("blocks")+"["+blocks+"]"
       +","+JKey("strategy")+g_strategy.Diagnostics()+","+JKey("sizing")+g_trader.PlanJson()+"}";
    Print("[Office][M15 check] ",g_checkJson);
+   string stage=eligible ? "ready" : (!g_signalReady && !occupied ? "waiting" : "blocked");
+   g_timeline.Record(ref.check_id+":decision",ref,"decision",stage,"OnNewBar","{"+JKey("check")+g_checkJson+"}");
    g_reportNow=true;
   }
 
@@ -727,8 +824,15 @@ void OnNewBar(void)
       return;
      }
    bool sent=false;
+   // Immutable decision precedes the order call; later outcomes are separate.
+   RecordStrategyCheck(signal,occupied,"entry eligible; preparing MT5 order call",true);
+   SDecisionRef ref; ZeroMemory(ref); ref.version=ROBOT_VERSION;
+   ref.bar_at=ClockServerToUtc(iTime(_Symbol,PERIOD_M15,0)); ref.check_id=DecisionId(ROBOT_VERSION,ref.bar_at);
+   string nonce=JInt((long)(GetMicrosecondCount()%1000000000));
+   string comment="TO|"+ROBOT_VERSION+"|"+JInt((long)ref.bar_at)+"|"+nonce;
+   ref.attempt_id=ref.check_id+"/"+nonce; g_timeline.Remember(ref);
    bool opened=g_trader.Open((int)signal,stopPrice,4.0*atr,InpTargetR,risk,
-                             InpMaxLots,"XAU plan "+ROBOT_VERSION,info,sent);
+                             InpMaxLots,comment,info,sent,g_timeline,ref);
    if(sent)
       g_guards.AddRequest();
    if(opened)
@@ -736,12 +840,10 @@ void OnNewBar(void)
       // Only the broker's DEAL_ENTRY_IN confirms a fill. The transaction
       // callback below counts it and sends the Telegram trade notification.
       Print("[Office] Entry order accepted: ",info,". Waiting for the fill.");
-      RecordStrategyCheck(signal,occupied,"order accepted; waiting for fill",true);
      }
    else
      {
       if(!sent && reviewing) g_sizeSkipsToday++;
-      RecordStrategyCheck(signal,occupied,sent ? "broker rejected order" : "quote or sizing changed before entry");
       Event(sent ? "error" : "info","Skipped a plan signal: "+info);
      }
   }
@@ -818,6 +920,7 @@ int OnInit(void)
      }
    g_trader.Init(_Symbol,InpMagic,InpMaxSlippagePoints);
    g_link.Init(OrDefault(InpOfficeUrl,OFFICE_URL),OrDefault(InpOfficeKey,OFFICE_KEY),Cleaned(InpRobotToken));
+   g_timeline.Init(Cleaned(InpRobotToken),_Symbol,InpMagic,g_link.Enabled());
 
    g_state=STATE_PAUSED;
    bool resumed=false;
@@ -856,7 +959,8 @@ void OnDeinit(const int reason)
    else
       Event("stopped","Stopped: "+DeinitReasonText(reason));
    string commands;
-   g_link.Sync(BuildReport(),commands,2000);   // best effort
+   if(g_link.Sync(BuildReport(),commands,2000)) g_timeline.AcknowledgeBatch();
+   g_timeline.Close();
    g_strategy.Deinit();
    Comment("");
   }
@@ -887,7 +991,7 @@ void OnTimer(void)
    if(!g_link.Enabled() || !g_link.ReadyToTry())
       return;
    datetime now=TimeLocal();
-   bool reportDue=g_reportNow || g_link.HasQueued() || now-g_lastReport>=InpReportSeconds;
+   bool reportDue=g_reportNow || g_link.HasQueued() || g_timeline.HasPending() || now-g_lastReport>=InpReportSeconds;
    if(!reportDue && now-g_lastPoll<InpPollSeconds)
       return;
    SyncOnce(reportDue);
@@ -895,12 +999,25 @@ void OnTimer(void)
 
 void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &request,const MqlTradeResult &result)
   {
+   if(trans.type==TRADE_TRANSACTION_REQUEST && request.magic==(ulong)InpMagic && request.symbol==_Symbol)
+     {
+      SDecisionRef ref; ZeroMemory(ref);
+      if(!TraceComment(request.comment,ref)) g_timeline.Find(result.order,result.request_id,ref);
+      if(ref.check_id!="") { ref.order=result.order; ref.request_id=result.request_id; g_timeline.Remember(ref); }
+      string id=(ref.attempt_id!="" ? ref.attempt_id+":request:" : "request:"+JInt((long)ClockGmt())+":"+JInt((long)GetMicrosecondCount())+":")
+         +JInt(result.request_id)+":"+TicketString(result.order)+":"+JInt(result.retcode);
+      g_timeline.Record(id,ref,"response",ResponseStage(true,result.retcode),"OnTradeTransaction",TradeResponseJson(request,result,true));
+      g_reportNow=true; return;
+     }
+   if(trans.type==TRADE_TRANSACTION_HISTORY_ADD || trans.type==TRADE_TRANSACTION_HISTORY_UPDATE)
+      RecordBrokerOrder(trans.order);
    if(trans.type!=TRADE_TRANSACTION_DEAL_ADD || !HistoryDealSelect(trans.deal))
       return;
    if(HistoryDealGetInteger(trans.deal,DEAL_MAGIC)!=InpMagic
       || HistoryDealGetString(trans.deal,DEAL_SYMBOL)!=_Symbol)
       return;
    g_link.QueueDeal(DealJson(trans.deal));
+   RecordBrokerDeal(trans.deal,false);
    g_guards.InvalidateLosses();
    long entry=HistoryDealGetInteger(trans.deal,DEAL_ENTRY);
    if(entry==DEAL_ENTRY_IN)

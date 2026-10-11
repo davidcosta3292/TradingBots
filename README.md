@@ -23,7 +23,7 @@ Supabase Edge Function     ──news reports─►    ▲
 ### 1. Database (one of us, about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com). Pick an EU region (Frankfurt).
-2. **SQL Editor:** run migrations `0001` to `0010` in order, then `0012` for owner-controlled deletion. Apply the timestamped migrations afterward, in filename order, for M15 diagnostics and Analyst evidence/history. Migration `0011` schedules this project's Analyst function and requires its Vault token first; its URL and public key must be changed for another Supabase project.
+2. **SQL Editor:** run migrations `0001` to `0010` in order, then `0012` for owner-controlled deletion. Apply the timestamped migrations afterward, in filename order, for M15 diagnostics, the trade decision timeline and Analyst evidence/history. Migration `0011` schedules this project's Analyst function and requires its Vault token first; its URL and public key must be changed for another Supabase project.
 3. **Authentication → Sign In / Providers:** turn off *Allow new users to sign up*.
 4. **Authentication → Users → Add user:** create a login for each of us. Tick *Auto Confirm User*.
 5. **SQL Editor:** let both logins in. An office member can create up to six slots from the hosted page; administrators can also use the helpers below:
@@ -90,6 +90,16 @@ In the office, where a robot is tells you what it's doing:
 | At its desk, scratching its head | Blocked by something that needs you, like Algo Trading switched off in MetaTrader |
 | On the sofa | Paused, or done for today |
 | Asleep and grey | Offline: a Trader or Analyst stopped reporting |
+
+### Trade decision timeline · EA 1.3.1
+
+Select a Trader, then open **Trade decision timeline**. It loads that robot’s captured execution history automatically in Office view; **Load execution history / Refresh execution history** is also available in Cards view.
+
+Each M15 check has its own ID. The timeline links its strategy gates and sizing to the refreshed MT5 order call, actual return code, broker order/deal tickets, and confirmed entry or exit deals. Waiting and blocked checks remain visible. **Accepted** describes a response; **Fill received** requires an actual broker deal. Missing evidence stays unverified. Earlier EA versions have no execution link, and unlinked transactions are displayed separately. Times are New York.
+
+EA **1.3.1** adds telemetry to strategy revision **1.3.0**; it does not change its entry definitions, risk, hours or guards. Remove and reattach **OfficeRobot → OfficeRobot**, keep your existing token/magic number, and press **Start** after it reports 1.3.1. A fresh attachment starts paused. On Mac, download the updated source archive and compile it with F7 before reattaching.
+
+New records are queued in an append-only local journal under **File → Open Data Folder → MQL5/Files/OfficeTimeline**. Successful reports checkpoint the queue; outages and restarts replay telemetry with stable IDs, never orders. Journal filenames are hashes, not tokens. Source archives exclude journals. Disk failures use a bounded memory queue and show a warning; that fallback does not survive a restart. Supabase retains timeline records for 30 days; local journals are not automatically pruned. Read [plan/decision-timeline.md](plan/decision-timeline.md) for correlation and recovery limits.
 
 ### Fundamental Analyst · economic news
 

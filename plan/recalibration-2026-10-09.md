@@ -58,7 +58,7 @@ Every completed M15 evaluation records closed prices, EMA/ATR values, reaction/c
 
 When a pattern exists, the office shows stop distance, minimum-lot risk, risk budget and calculated lots. The EA floors volume and rejects minimum lots that exceed budget; it does not increase risk to manufacture an entry. Values exclude fees/slippage.
 
-Latest checks are reported in robot status. Supabase retains structured check history for 30 days, with one record per robot/bar/version. Every check is also printed in local MetaTrader Experts logs. During an office outage only the latest status is later synchronized; local logs preserve earlier checks, but they are not automatically backfilled to Supabase.
+Latest checks are reported in robot status. Supabase retains structured check history for 30 days, with one record per robot/bar/version. Every check is also printed in local MetaTrader Experts logs. In version 1.3.0, an office outage synchronizes only the latest status; local logs preserve earlier checks without automatic backfill. Version 1.3.1 adds a durable decision journal that backfills queued checks and execution events, as described in [decision-timeline.md](decision-timeline.md). The strategy revision remains 1.3.0.
 
 Verified: native compilation; frontend syntax and renderer checks; database trigger deduplication and rollback; replay of seven separate variants. Existing Supabase advisories concern intentional token-authenticated RPCs and private tables, plus disabled leaked-password protection; this migration introduced no new security warning.
 

@@ -9,6 +9,7 @@
 #include <Trade\Trade.mqh>
 #include "Clock.mqh"
 #include "Json.mqh"
+#include "Timeline.mqh"
 
 class COfficeTrader
   {
@@ -198,25 +199,41 @@ public:
         }
       m_planReady=true; m_planReason="size fits the risk budget (before fees)"; info=m_planReason; return true;
      }
-   // sent is true only when an order actually went to the server.
+   // sent means the CTrade call was invoked, not proven server receipt or fill.
    bool Open(const int direction,const double stopPrice,const double maxStopDistance,
              const double targetR,const double riskMoney,const double maxAllowedLots,
-             const string comment,string &info,bool &sent)
+             const string comment,string &info,bool &sent,CDecisionJournal &journal,SDecisionRef &ref)
      {
       sent=false;
-      if(!Preview(direction,stopPrice,maxStopDistance,targetR,riskMoney,maxAllowedLots,info)) return false;
+      if(!Preview(direction,stopPrice,maxStopDistance,targetR,riskMoney,maxAllowedLots,info))
+        {
+         journal.Record(ref.attempt_id+":preflight",ref,"submission","blocked","CTrade",
+                        "{"+JKey("message")+JStr(info)+","+JKey("sizing")+PlanJson()+"}");
+         return false;
+        }
       bool buy=direction>0; int digits=(int)SymbolInfoInteger(m_symbol,SYMBOL_DIGITS);
       double lots=m_volume,sl=m_stop,tp=m_target;
       double step=SymbolInfoDouble(m_symbol,SYMBOL_VOLUME_STEP);
       int volumeDigits=(int)MathMax(0,MathRound(-MathLog10(step)));
       sent=true;
+      journal.Record(ref.attempt_id+":submission",ref,"submission","submitted","CTrade",
+                     "{"+JKey("side")+JStr(buy ? "buy" : "sell")+","+JKey("sizing")+PlanJson()+"}");
+      ResetLastError();
+      ulong started=GetMicrosecondCount();
       bool ok=buy ? m_trade.Buy(lots,m_symbol,0.0,sl,tp,comment)
                   : m_trade.Sell(lots,m_symbol,0.0,sl,tp,comment);
+      int terminalError=GetLastError();
+      long duration=(long)(GetMicrosecondCount()-started);
+      MqlTradeRequest request; MqlTradeResult result;
+      m_trade.Request(request); m_trade.Result(result);
+      ref.order=result.order; ref.request_id=result.request_id; journal.Remember(ref);
+      journal.Record(ref.attempt_id+":response",ref,"response",ResponseStage(ok,result.retcode),"CTrade",
+                     TradeResponseJson(request,result,ok,terminalError,duration));
       uint code=m_trade.ResultRetcode();
       if(!ok || (code!=TRADE_RETCODE_DONE && code!=TRADE_RETCODE_DONE_PARTIAL
                  && code!=TRADE_RETCODE_PLACED))
         {
-         info=StringFormat("order rejected: %s",m_trade.ResultRetcodeDescription());
+         info=StringFormat("order result %s: %s",ResponseStage(ok,code),m_trade.ResultRetcodeDescription());
          m_planReason=info;
          return false;
         }
